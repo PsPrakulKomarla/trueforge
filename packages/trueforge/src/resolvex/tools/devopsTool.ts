@@ -20,6 +20,7 @@ export interface ToolContext {
   incidentId: string;
   correlationId: string;
   tenantId: string;
+  userId?: string;
   signal: AbortSignal;
 }
 
