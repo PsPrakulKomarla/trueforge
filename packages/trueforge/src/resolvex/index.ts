@@ -126,3 +126,4 @@ export { PROVIDER_CAPABILITIES, unavailableResult, unsupportedResult, type DevOp
 export { createPersistentExecutionStore, ToolExecutionRecordSchema, ResolveXExecutionRecordSchema, type ExecutionStore, type ResolveXExecutionRecord, type ToolExecutionRecord } from './store/executionStore';
 export { correlateEvidence, diagnosisHasProvenance, normalizeToolEvidence, type EvidenceCorrelation, type NormalizedEvidence, type EvidenceRelation } from './services/evidenceCorrelation';
 export { createResolveXConnector, type ConnectorOperation, type ConnectorResult, type ResolveXConnector } from './providers/connector';
+export { EnvironmentSchema, ExecutionModeSchema, RemediationRequestSchema, evaluateRemediation, executeModeResult, remediationPlanHash, type ApprovalBinding, type ExecutionMode, type RemediationRequest, type ResolveXEnvironment, type PolicyDecision } from './providers/executionPolicy';
