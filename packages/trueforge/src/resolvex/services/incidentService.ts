@@ -71,7 +71,7 @@ export function createIncidentService(
       throw new Error(`Unknown tool: ${toolId}`);
     }
     try {
-      const result = await tool.execute(args, context(incident));
+      const result = await Promise.race([tool.execute(args, context(incident)), new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Tool ${tool.id} timed out after ${String(tool.timeoutMs)}ms`)), tool.timeoutMs))]);
       await change(incident.id, current => {
         current.actions.push({
           at: now(),
@@ -336,6 +336,9 @@ export function createIncidentService(
       const step = plan?.steps[0];
       if (incident.state !== 'remediating' || plan === null || step === undefined || plan.status !== 'approved') {
         throw new Error('Incident is not approved for remediation');
+      }
+      if (step.status === 'succeeded' || plan.status === 'done') {
+        return incident;
       }
       const result = await invoke(incident, 'execute_safe_remediation', step.args, actor);
       await change(id, current => {

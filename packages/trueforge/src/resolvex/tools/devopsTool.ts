@@ -54,6 +54,12 @@ export interface DevOpsTool {
   category: ToolCategory;
   risk: RiskLevel;
   requiredPermissions: string[];
+  /** Explicit execution safety metadata; never inferred from tool names. */
+  mutating: boolean;
+  requiresApproval: boolean;
+  idempotent: boolean;
+  retryable: boolean;
+  timeoutMs: number;
   /** JSON Schema of the input, advertised to the planner and the UI. */
   inputSchema: Record<string, unknown>;
   /** Original schema used to validate arguments at the MCP boundary. */
@@ -76,6 +82,11 @@ export function defineDevOpsTool<TArgs>(config: {
   category: ToolCategory;
   risk: RiskLevel;
   requiredPermissions?: readonly string[];
+  mutating?: boolean;
+  requiresApproval?: boolean;
+  idempotent?: boolean;
+  retryable?: boolean;
+  timeoutMs?: number;
   schema: z.ZodType<TArgs>;
   execute: (args: TArgs, ctx: ToolContext) => Promise<ToolResult>;
   validate?: (args: TArgs, ctx: ToolContext) => Promise<ToolValidation>;
@@ -96,6 +107,11 @@ export function defineDevOpsTool<TArgs>(config: {
     category: config.category,
     risk: config.risk,
     requiredPermissions: [...(config.requiredPermissions ?? [])],
+    mutating: config.mutating ?? config.category === 'remediation',
+    requiresApproval: config.requiresApproval ?? config.category === 'remediation',
+    idempotent: config.idempotent ?? false,
+    retryable: config.retryable ?? config.category !== 'remediation',
+    timeoutMs: config.timeoutMs ?? 30_000,
     inputSchema: config.schema.toJSONSchema({ io: 'input' }),
     schema: config.schema,
     execute: (rawArgs, ctx) => config.execute(parse(rawArgs), ctx),
