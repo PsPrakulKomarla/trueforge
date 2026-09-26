@@ -95,3 +95,4 @@ export { createPersistentIncidentStore } from './store/incidentStore';
 export { createServiceGraph, createDemoServiceGraph, GraphNodeKindSchema, GraphRelationSchema, GraphNodeSchema, GraphEdgeSchema, type ServiceGraph, type GraphNode, type GraphEdge, type RelevantGraphNode } from './graph/serviceGraph';
 export { createResolveXAgentDefinition } from './agent';
 export { createResolveXToolMCP, ResolveXToolMCP } from './tools/registryAdapter';
+export { executeResolveXInvestigation, type ResolveXExecutionResult, type ResolveXExecutionState } from './agentExecution';
