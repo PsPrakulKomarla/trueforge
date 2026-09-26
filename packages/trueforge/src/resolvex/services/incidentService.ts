@@ -6,7 +6,7 @@ import type { ServiceGraph } from '../graph/serviceGraph';
 import { approvalRequirement } from '../policies/approvalPolicy';
 import { IncidentNotFoundError, type IncidentStore } from '../store/incidentStore';
 import { createDemoEnvironment, createDemoTools } from '../tools/demoTools';
-import { createDevOpsToolRegistry, type ToolContext } from '../tools/devopsTool';
+import { createDevOpsToolRegistry, type ToolContext, type ToolResult } from '../tools/devopsTool';
 
 const now = () => new Date().toISOString();
 
@@ -17,6 +17,7 @@ export function createIncidentService(
   graph?: ServiceGraph,
   tenantId = 'demo',
 ) {
+  const activeRemediations = new Set<string>();
   const registry = createDevOpsToolRegistry();
   const environment = createDemoEnvironment();
   for (const tool of createDemoTools(environment)) {
@@ -294,6 +295,10 @@ export function createIncidentService(
         if (incident.state !== 'approval_required' || incident.plan === null) {
           throw new Error('Approval is not pending');
         }
+        const pendingApproval = incident.approvals.at(-1);
+        if (pendingApproval?.decision !== undefined) {
+          throw new Error('Approval has already been decided');
+        }
         assertTransition(incident.state, 'remediating');
         const approval = incident.approvals.at(-1);
         if (approval === undefined) {
@@ -340,7 +345,16 @@ export function createIncidentService(
       if (step.status === 'succeeded' || plan.status === 'done') {
         return incident;
       }
-      const result = await invoke(incident, 'execute_safe_remediation', step.args, actor);
+      if (activeRemediations.has(id)) {
+        throw new Error('Remediation is already executing');
+      }
+      activeRemediations.add(id);
+      let result: ToolResult;
+      try {
+        result = await invoke(incident, 'execute_safe_remediation', step.args, actor);
+      } finally {
+        activeRemediations.delete(id);
+      }
       await change(id, current => {
         const currentPlan = current.plan;
         const currentStep = currentPlan?.steps[0];
@@ -362,6 +376,9 @@ export function createIncidentService(
       const incident = await store.get(id);
       if (incident === undefined) {
         throw new IncidentNotFoundError(id);
+      }
+      if (incident.state === 'resolved' || incident.state === 'failed' || incident.state === 'cancelled') {
+        return incident;
       }
       if (incident.state !== 'verifying') {
         assertTransition(incident.state, 'resolved');
