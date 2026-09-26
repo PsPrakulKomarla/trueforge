@@ -160,7 +160,7 @@ export function createIncidentService(store: IncidentStore, settings: ResolvexSe
     graph(id: string) {
       const incident = store.get(id);
       if (!incident) throw new Error('Incident not found');
-      return { affected: graph.getNode(incident.service), related: graph.relevantTo(incident.service, 2), nodes: graph.nodes(), edges: graph.edges() };
+      return { affected: graph.getNode(incident.service), related: graph.relevantTo(incident.service, 2), dependencies: graph.getDependencies(incident.service), dependents: graph.getDependents(incident.service), nodes: graph.nodes(), edges: graph.edges() };
     },
     createPlan(id: string) {
       return change(id, i => {
@@ -265,6 +265,14 @@ export function createIncidentService(store: IncidentStore, settings: ResolvexSe
           assertTransition(x.state, 'resolved');
           x.state = 'resolved';
           event(x, 'report_generated', 'Incident resolved');
+        } else if ((x.verification?.attempts ?? 0) >= settings.maxVerificationAttempts) {
+          assertTransition(x.state, 'failed');
+          x.state = 'failed';
+          event(x, 'report_generated', 'Verification failed after the configured retry limit');
+        } else {
+          assertTransition(x.state, 'investigating');
+          x.state = 'investigating';
+          event(x, 'state_changed', 'Verification failed; investigation required before another remediation attempt');
         }
       });
       return store.get(id)!;

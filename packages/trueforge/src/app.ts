@@ -9,7 +9,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import type { Configuration } from 'openid-client';
 import type { Logger } from 'winston';
-import { createInMemoryIncidentStore } from './resolvex/store/incidentStore';
+import { createPersistentIncidentStore } from './resolvex/store/incidentStore';
 import { resolvexSettings } from './resolvex/config';
 import { createAgentImportRouter } from './apis/agentImport';
 import { createAgentsRouter } from './apis/agents';
@@ -259,7 +259,7 @@ export function createServerApp<TTransaction>(deps: ServerDeps<TTransaction>) {
 
   // ResolveX remains behind the same TrueForge authentication boundary as the other APIs.
   // The store is injectable in future server wiring; this fallback preserves the demo-safe API.
-  app.route('/api/resolvex', withAuth(createResolvexRouter({ store: createInMemoryIncidentStore(), settings: resolvexSettings(configuration) }), authMiddleware));
+  app.route('/api/resolvex', withAuth(createResolvexRouter({ store: createPersistentIncidentStore(`${configuration.SQLITE_PATH}.resolvex.json`), settings: resolvexSettings(configuration) }), authMiddleware));
 
   app.route(
     '/api/v1/auth',
