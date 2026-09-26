@@ -118,3 +118,4 @@ export { createDemoEnvironment, createDemoTools, type DemoEnvironment } from './
 export { ResolvexToolMCP, createResolvexToolMCP } from './tools/registryAdapter';
 export { executeResolveXInvestigation, type ResolveXExecutionResult, type ResolveXExecutionState } from './agentExecution';
 export { ResolveXExecutionSchema, ResolveXExecutionStateSchema, assertExecutionTransition, canTransitionExecution, decideRecovery, type ResolveXExecution, type ResolveXExecutionState, type RecoveryDecision } from './domain/execution';
+export { buildRecommendation, extractResolutionRecord, findSimilarIncidents, similarity, type SimilarIncident, type SimilaritySignal, type ResolutionRecord, type RemediationRecommendation } from './services/incidentMemory';
