@@ -131,3 +131,4 @@ export { correlateIncidents, findRootCauseCandidates, groupCorrelatedIncidents, 
 export { assessRisk, calculateBaseline, calculateBlastRadius, createPrediction, detectAnomaly, type Anomaly, type Baseline, type Prediction, type PredictionStatus, type RiskAssessment, type Telemetry } from './services/predictiveIntelligence';
 export { assertActionTransition, canTransitionAction, decideAfterVerification, evaluateAction, planIdentity, transitionExecution, validatePlan, RemediationActionSchema, type ActionState, type RemediationAction, type RemediationPlan } from './services/remediationOrchestrator';
 export { extractIncidentMemory, retrieveMemory, type IncidentMemory, type MemoryConfirmation, type MemoryMatch } from './services/historicalMemory';
+export { createCircuitBreaker, degradedMode, retrySafe, ResolveXOperationalError, type CircuitBreaker, type CircuitState, type ResolveXErrorCode } from './services/operationalSafety';
