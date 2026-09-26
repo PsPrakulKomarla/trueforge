@@ -1,5 +1,7 @@
 import { OpenAPIHono, type RouteHandler } from '@hono/zod-openapi';
+import type { Context } from 'hono';
 import type { ResolveRequestContext } from '../auth/identity';
+import type { IModelProviderStore } from '../db/modelProviderStore';
 import type { ResolvexSettings } from '../resolvex/config';
 import type { Incident } from '../resolvex/domain/incident';
 import { IllegalIncidentTransitionError } from '../resolvex/domain/incidentState';
@@ -33,11 +35,13 @@ export interface ResolvexRouterDeps {
   resolveRequestContext: ResolveRequestContext;
   resolveIncidentStore: (tenant_id: string) => IncidentStore;
   resolveGraphStore: (tenant_id: string) => GraphStore;
+  resolveModelProviderStore: (c: Context) => IModelProviderStore;
   settings: ResolvexSettings;
 }
 
 export function createResolvexRouter(deps: ResolvexRouterDeps) {
-  const runtimeFor = async (tenantId: string): Promise<ResolvexRuntime> => {
+  const runtimes = new Map<string, Promise<ResolvexRuntime>>();
+  const createRuntime = async (tenantId: string): Promise<ResolvexRuntime> => {
     const graphStore = deps.resolveGraphStore(tenantId);
     let graph = await graphStore.load();
     let isDemo = graph.getNodes().some(node => node.metadata?.['source'] === 'deterministic-demo');
@@ -51,6 +55,17 @@ export function createResolvexRouter(deps: ResolvexRouterDeps) {
       graph,
       is_demo: isDemo,
     };
+  };
+  const runtimeFor = async (tenantId: string): Promise<ResolvexRuntime> => {
+    let runtime = runtimes.get(tenantId);
+    if (runtime === undefined) {
+      runtime = createRuntime(tenantId).catch((error: unknown) => {
+        runtimes.delete(tenantId);
+        throw error;
+      });
+      runtimes.set(tenantId, runtime);
+    }
+    return runtime;
   };
 
   const router = new OpenAPIHono();

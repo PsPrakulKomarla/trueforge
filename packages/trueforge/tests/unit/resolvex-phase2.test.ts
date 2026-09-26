@@ -2,6 +2,7 @@ import type { ILLM } from '@truefoundry/trueforge-core/core';
 import { z } from 'zod';
 import { createResolvexRouter } from '../../src/apis/resolvex';
 import { STANDALONE_REQUEST_CONTEXT } from '../../src/auth/identity';
+import type { ModelProviderRecord } from '../../src/db/modelProviderStore';
 import { createResolvexAgentDefinition } from '../../src/resolvex/agent';
 import { createDemoServiceGraph } from '../../src/resolvex/graph/demoTopology';
 import { createInMemoryGraphStore } from '../../src/resolvex/graph/graphStore';
@@ -14,6 +15,17 @@ import {
   GetResolvexIncidentResponseSchema,
   ListResolvexIncidentsResponseSchema,
 } from '../../src/schemas/resolvex';
+
+function makeModelProviderRecord(overrides: Partial<ModelProviderRecord> = {}): ModelProviderRecord {
+  return {
+    tenant_id: '',
+    name: '',
+    manifest: { type: 'openai', base_url: '', auth: { api_key: '' }, models: [] },
+    created_at: '',
+    updated_at: '',
+    ...overrides,
+  };
+}
 
 const settings = {
   enabled: true,
@@ -55,6 +67,14 @@ describe('ResolveX Phase 2 integration', () => {
         }
         return store;
       },
+      resolveModelProviderStore: () => ({
+        listProviders: async () => [],
+        getProvider: async () => undefined,
+        getProviderForUpdate: async () => undefined,
+        createProvider: async () => makeModelProviderRecord(),
+        upsertProvider: async () => makeModelProviderRecord(),
+        listModels: async () => [],
+      }),
     });
 
     const createdResponse = await router.request(

@@ -25,8 +25,9 @@ export const DEMO_TENANT_ID = 'demo';
 
 export function createDemoServiceGraph(): ServiceGraph {
   const graph = createServiceGraph();
-  const addDemoNode = (node: Omit<GraphNode, 'metadata'>) =>
+  const addDemoNode = (node: Omit<GraphNode, 'metadata'>) => {
     graph.addNode({ ...node, metadata: { source: 'deterministic-demo' } });
+  };
 
   // Nodes
   addDemoNode({ id: 'frontend', type: 'service', name: 'Frontend Web App' });

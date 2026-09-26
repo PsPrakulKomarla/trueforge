@@ -6,7 +6,7 @@ import type { ServiceGraph } from '../graph/serviceGraph';
 import { approvalRequirement } from '../policies/approvalPolicy';
 import { IncidentNotFoundError, type IncidentStore } from '../store/incidentStore';
 import { createDemoEnvironment, createDemoTools } from '../tools/demoTools';
-import { createDevOpsToolRegistry, type ToolContext, type ToolResult } from '../tools/devopsTool';
+import { type ToolContext, type ToolResult } from '../tools/devopsTool';
 
 const now = () => new Date().toISOString();
 
@@ -18,7 +18,6 @@ export function createIncidentService(
   tenantId = 'demo',
 ) {
   const activeRemediations = new Set<string>();
-  const registry = createDevOpsToolRegistry();
   const environment = createDemoEnvironment();
   for (const tool of createDemoTools(environment)) {
     registry.register(tool);
@@ -72,7 +71,15 @@ export function createIncidentService(
       throw new Error(`Unknown tool: ${toolId}`);
     }
     try {
-      const result = await Promise.race([tool.execute(args, context(incident)), new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Tool ${tool.id} timed out after ${String(tool.timeoutMs)}ms`)), tool.timeoutMs))]);
+      const result = await Promise.race([
+        tool.execute(args, context(incident)),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Tool ${tool.id} timed out after ${String(tool.timeoutMs)}ms`)),
+            tool.timeoutMs,
+          ),
+        ),
+      ]);
       await change(incident.id, current => {
         current.actions.push({
           at: now(),
@@ -159,7 +166,7 @@ export function createIncidentService(
       ];
       for (const [toolId, summary, kind] of tools) {
         const result = await invoke(current, toolId, { service: current.service }, 'agent:resolvex');
-        current = await change(id, incident => {
+        await change(id, incident => {
           incident.evidence.push({
             id: `ev-${randomUUID()}`,
             kind,
@@ -204,7 +211,7 @@ export function createIncidentService(
             },
           });
         }
-        current = await change(id, incident => {
+        await change(id, incident => {
           const record: EvidenceRecord = {
             id: `ev-graph-${randomUUID()}`,
             kind: 'graph',
@@ -226,7 +233,7 @@ export function createIncidentService(
         });
       }
 
-      current = await change(id, incident => {
+      await change(id, incident => {
         assertTransition(incident.state, 'diagnosed');
         const evidenceIds = incident.evidence
           .filter(evidence => evidence.kind === 'health' || evidence.kind === 'log' || evidence.kind === 'deployment')

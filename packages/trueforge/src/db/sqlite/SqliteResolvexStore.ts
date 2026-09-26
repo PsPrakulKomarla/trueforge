@@ -16,7 +16,7 @@ import { isUniqueViolation } from './client';
 import { jsonbBind, jsonText } from './sqlExpressions';
 import type { Database } from './types';
 
-type IncidentRow = {
+interface IncidentRow {
   id: string;
   tenant_id: string;
   service: string;
@@ -27,7 +27,7 @@ type IncidentRow = {
   created_at: string;
   updated_at: string;
   document: Record<string, unknown>;
-};
+}
 
 function incidentColumns(eb: ExpressionBuilder<Database, 'resolvex_incident'>) {
   return [

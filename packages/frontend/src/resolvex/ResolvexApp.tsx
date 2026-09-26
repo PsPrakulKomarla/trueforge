@@ -1,13 +1,7 @@
-/**
- * ResolveX command center — architectural entry point.
- *
- * Owns a sibling `BrowserRouter` (the chat shell has its own), a shell layout, and
- * the route table. Pages land in later phases; Phase 1 establishes where they go
- * so no route has to be re-plumbed when the real screens arrive.
- */
+/** ResolveX owns a sibling router so incident routes do not conflict with the chat shell. */
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
+import { IncidentDetailPage, IncidentsPage } from './pages/IncidentsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
-import { IncidentsPage } from './pages/IncidentsPage';
 
 interface ResolveXRoute {
   path: string;
@@ -18,7 +12,7 @@ interface ResolveXRoute {
 /** Single source of truth for the command-center navigation and routes. */
 export const RESOLVEX_ROUTES: ResolveXRoute[] = [
   { path: '/', title: 'Dashboard', detail: 'Fleet health, open incidents and verification status. Phase 12.' },
-  { path: '/incidents', title: 'Incidents', detail: 'List and filter incidents across services. Phase 3.' },
+  { path: '/incidents', title: 'Incidents', detail: 'Live incident list.' },
   {
     path: '/investigation',
     title: 'Investigation',
@@ -59,9 +53,16 @@ export function ResolvexApp({ basename }: { basename: string }) {
                 <Route
                   key={route.path}
                   path={route.path}
-                  element={route.path === '/incidents' ? <IncidentsPage /> : <PlaceholderPage title={route.title} detail={route.detail} />}
+                  element={
+                    route.path === '/incidents' ? (
+                      <IncidentsPage />
+                    ) : (
+                      <PlaceholderPage title={route.title} detail={route.detail} />
+                    )
+                  }
                 />
               ))}
+              <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
             </Routes>
           </main>
         </div>

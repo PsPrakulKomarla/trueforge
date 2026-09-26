@@ -9,8 +9,8 @@
  * (IncidentService, tests, demo tooling) is storage-agnostic.
  *
  */
-import { IncidentSchema, type Incident } from '../domain/incident';
 import { createRequire } from 'node:module';
+import { IncidentSchema, type Incident } from '../domain/incident';
 const require = createRequire(import.meta.url);
 
 export interface IncidentStore {
@@ -37,28 +37,28 @@ export class IncidentStoreConflictError extends Error {
 export function createInMemoryIncidentStore(): IncidentStore {
   const incidents = new Map<string, Incident>();
   return {
-    async create(incident) {
+    create(incident) {
       if (incidents.has(incident.id)) {
         throw new Error(`Incident already exists: ${incident.id}`);
       }
       incidents.set(incident.id, structuredClone(incident));
-      return structuredClone(incident);
+      return Promise.resolve(structuredClone(incident));
     },
-    async get(id) {
+    get(id) {
       const incident = incidents.get(id);
-      return incident === undefined ? undefined : structuredClone(incident);
+      return Promise.resolve(incident === undefined ? undefined : structuredClone(incident));
     },
-    async update(id, update) {
+    update(id, update) {
       const current = incidents.get(id);
       if (current === undefined) {
         throw new IncidentNotFoundError(id);
       }
       const next = update(structuredClone(current));
       incidents.set(id, structuredClone(next));
-      return structuredClone(next);
+      return Promise.resolve(structuredClone(next));
     },
-    async list() {
-      return [...incidents.values()].map(incident => structuredClone(incident));
+    list() {
+      return Promise.resolve([...incidents.values()].map(incident => structuredClone(incident)));
     },
   };
 }
@@ -90,9 +90,28 @@ export function createPersistentIncidentStore(filePath: string): IncidentStore {
     fs.renameSync(temporary, filePath);
   };
   return {
-    create(incident) { const incidents = load(); if (incidents.has(incident.id)) throw new Error(`Incident already exists: ${incident.id}`); incidents.set(incident.id, structuredClone(incident)); save(incidents); return structuredClone(incident); },
-    get(id) { const incident = load().get(id); return incident ? structuredClone(incident) : undefined; },
-    update(id, updater) { const incidents = load(); const current = incidents.get(id); if (!current) throw new Error(`Incident not found: ${id}`); const next = updater(structuredClone(current)); incidents.set(id, structuredClone(next)); save(incidents); return structuredClone(next); },
-    list() { return [...load().values()].map(structuredClone); },
+    create(incident) {
+      const incidents = load();
+      if (incidents.has(incident.id)) throw new Error(`Incident already exists: ${incident.id}`);
+      incidents.set(incident.id, structuredClone(incident));
+      save(incidents);
+      return structuredClone(incident);
+    },
+    get(id) {
+      const incident = load().get(id);
+      return incident ? structuredClone(incident) : undefined;
+    },
+    update(id, updater) {
+      const incidents = load();
+      const current = incidents.get(id);
+      if (!current) throw new Error(`Incident not found: ${id}`);
+      const next = updater(structuredClone(current));
+      incidents.set(id, structuredClone(next));
+      save(incidents);
+      return structuredClone(next);
+    },
+    list() {
+      return [...load().values()].map(structuredClone);
+    },
   };
 }

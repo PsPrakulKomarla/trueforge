@@ -22,11 +22,12 @@ export function graphFromJSON(input: {
 export function createInMemoryGraphStore(initial: ServiceGraph = createServiceGraph()): GraphStore {
   let data = initial.toJSON();
   return {
-    async load() {
-      return graphFromJSON(data);
+    load() {
+      return Promise.resolve(graphFromJSON(data));
     },
-    async save(graph) {
+    save(graph) {
       data = graph.toJSON();
+      return Promise.resolve();
     },
   };
 }

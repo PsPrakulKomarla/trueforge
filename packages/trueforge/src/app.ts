@@ -9,8 +9,6 @@ import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import type { Configuration } from 'openid-client';
 import type { Logger } from 'winston';
-import { createPersistentIncidentStore } from './resolvex/store/incidentStore';
-import { resolvexSettings } from './resolvex/config';
 import { createAgentImportRouter } from './apis/agentImport';
 import { createAgentsRouter } from './apis/agents';
 import { createAuthRouter } from './apis/auth';
@@ -57,6 +55,7 @@ import { PACKAGE_VERSION } from './packageVersion';
 import { resolvexSettings } from './resolvex/config';
 import type { GraphStore } from './resolvex/graph/graphStore';
 import type { IncidentStore } from './resolvex/store/incidentStore';
+import { createPersistentIncidentStore } from './resolvex/store/incidentStore';
 import { OPENAPI_DOCUMENT_TAGS } from './routes/openapiTags';
 import type { ActiveTurnRegistry } from './runtime/activeTurns';
 import type { EventSubscriptionRegistry } from './runtime/event-subscription';
@@ -264,7 +263,16 @@ export function createServerApp<TTransaction>(deps: ServerDeps<TTransaction>) {
 
   // ResolveX remains behind the same TrueForge authentication boundary as the other APIs.
   // The store is injectable in future server wiring; this fallback preserves the demo-safe API.
-  app.route('/api/resolvex', withAuth(createResolvexRouter({ store: createPersistentIncidentStore(`${configuration.SQLITE_PATH}.resolvex.json`), settings: resolvexSettings(configuration) }), authMiddleware));
+  app.route(
+    '/api/resolvex',
+    withAuth(
+      createResolvexRouter({
+        store: createPersistentIncidentStore(`${configuration.SQLITE_PATH}.resolvex.json`),
+        settings: resolvexSettings(configuration),
+      }),
+      authMiddleware,
+    ),
+  );
 
   app.route(
     '/api/v1/auth',
@@ -372,6 +380,7 @@ export function createServerApp<TTransaction>(deps: ServerDeps<TTransaction>) {
           settings: resolveXSettings,
           resolveIncidentStore: deps.resolveIncidentStore,
           resolveGraphStore: deps.resolveGraphStore,
+          resolveModelProviderStore: deps.resolveModelProviderStore,
         }),
         authMiddleware,
       ),

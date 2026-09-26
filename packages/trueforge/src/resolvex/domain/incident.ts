@@ -232,6 +232,8 @@ export const IncidentSchema = z
      * node ids in the service dependency graph.
      */
     graph_evidence: z.array(GraphEvidenceSchema).default([]),
+    /** Serialized AgentThread state to allow resume after approval pause. */
+    agent_thread_snapshot: z.any().optional(),
   })
   .openapi('ResolvexIncident');
 
