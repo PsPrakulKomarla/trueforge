@@ -9,7 +9,7 @@
  * (IncidentService, tests, demo tooling) is storage-agnostic.
  *
  */
-import type { Incident } from '../domain/incident';
+import { IncidentSchema, type Incident } from '../domain/incident';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 
@@ -74,8 +74,10 @@ export function createPersistentIncidentStore(filePath: string): IncidentStore {
   const load = (): Map<string, Incident> => {
     try {
       const raw = fs.readFileSync(filePath, 'utf8') as string;
-      const values = JSON.parse(raw) as Incident[];
-      return new Map(values.map(incident => [incident.id, incident]));
+      const values = JSON.parse(raw) as unknown;
+      if (!Array.isArray(values)) throw new Error('ResolveX incident store is malformed: expected an array');
+      const incidents = values.map(value => IncidentSchema.parse(value));
+      return new Map(incidents.map(incident => [incident.id, incident]));
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return new Map();
       throw error;
