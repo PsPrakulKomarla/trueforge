@@ -245,6 +245,19 @@ function parseBoolean(options: { envKey: string; raw: string | undefined; defaul
   throw new Error(`Environment variable ${envKey} must be "true" or "false", got "${raw}"`);
 }
 
+/** Parses a fraction env var in `[0, 1]`, falling back to `defaultValue` when unset/blank. */
+function parseFraction(options: { envKey: string; raw: string | undefined; defaultValue: number }): number {
+  const { envKey, raw, defaultValue } = options;
+  if (raw === undefined || raw.trim() === '') {
+    return defaultValue;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0 || value > 1) {
+    throw new Error(`Environment variable ${envKey} must be a number between 0 and 1, got "${raw}"`);
+  }
+  return value;
+}
+
 function parsePostgresSchema(raw: string | undefined): string {
   if (raw === undefined || raw.trim() === '') {
     return DEFAULT_POSTGRES_SCHEMA;
@@ -836,6 +849,21 @@ export interface SharedServerConfiguration {
   SENTRY_ENABLED: boolean;
   SENTRY_DSN: string | undefined;
   SENTRY_ADDITIONAL_TAGS: Record<string, string>;
+  /** ResolveX incident API and engines. Env: `RESOLVEX_ENABLED`. Default true. */
+  RESOLVEX_ENABLED: boolean;
+  /**
+   * Model name ResolveX uses for investigation calls. Env: `RESOLVEX_MODEL_NAME`.
+   * Unset = the tenant's resolved default, so ResolveX never names an AI vendor.
+   */
+  RESOLVEX_MODEL_NAME: string | undefined;
+  /** Diagnosis below this confidence escalates instead of planning. Env: `RESOLVEX_CONFIDENCE_THRESHOLD`. Default 0.7. */
+  RESOLVEX_CONFIDENCE_THRESHOLD: number;
+  /** Verification retries before escalation. Env: `RESOLVEX_MAX_VERIFICATION_ATTEMPTS`. Default 3. */
+  RESOLVEX_MAX_VERIFICATION_ATTEMPTS: number;
+  /** Gate every non-read-only remediation step on an explicit approval. Env: `RESOLVEX_REQUIRE_APPROVAL`. Default true. */
+  RESOLVEX_REQUIRE_APPROVAL: boolean;
+  /** Exposes the seeded demo incident provider. Env: `RESOLVEX_DEMO_ENABLED`. Default true. */
+  RESOLVEX_DEMO_ENABLED: boolean;
 }
 
 export type StandaloneServerConfiguration = SharedServerConfiguration & {
@@ -1142,6 +1170,32 @@ const shared: SharedServerConfiguration = {
   }),
   SENTRY_DSN: getEnv('SENTRY_DSN', { required: false }),
   SENTRY_ADDITIONAL_TAGS: parseSentryAdditionalTags(getEnv('SENTRY_ADDITIONAL_TAGS', { required: false })),
+  RESOLVEX_ENABLED: parseBoolean({
+    envKey: 'RESOLVEX_ENABLED',
+    raw: getEnv('RESOLVEX_ENABLED'),
+    defaultValue: true,
+  }),
+  RESOLVEX_MODEL_NAME: getEnv('RESOLVEX_MODEL_NAME', { required: false }),
+  RESOLVEX_CONFIDENCE_THRESHOLD: parseFraction({
+    envKey: 'RESOLVEX_CONFIDENCE_THRESHOLD',
+    raw: getEnv('RESOLVEX_CONFIDENCE_THRESHOLD'),
+    defaultValue: 0.7,
+  }),
+  RESOLVEX_MAX_VERIFICATION_ATTEMPTS: parsePositiveInt({
+    envKey: 'RESOLVEX_MAX_VERIFICATION_ATTEMPTS',
+    raw: getEnv('RESOLVEX_MAX_VERIFICATION_ATTEMPTS'),
+    defaultValue: 3,
+  }),
+  RESOLVEX_REQUIRE_APPROVAL: parseBoolean({
+    envKey: 'RESOLVEX_REQUIRE_APPROVAL',
+    raw: getEnv('RESOLVEX_REQUIRE_APPROVAL'),
+    defaultValue: true,
+  }),
+  RESOLVEX_DEMO_ENABLED: parseBoolean({
+    envKey: 'RESOLVEX_DEMO_ENABLED',
+    raw: getEnv('RESOLVEX_DEMO_ENABLED'),
+    defaultValue: true,
+  }),
 };
 
 const configuration: ServerConfiguration = standalone

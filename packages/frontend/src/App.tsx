@@ -22,6 +22,8 @@ import { GetStartedScreen } from './GetStartedScreen';
 import { LogoutButton } from './LogoutButton';
 import { NewAgentWelcomeScreen } from './NewAgentWelcomeScreen';
 import { API_BASE_URL, uiRouterBasename } from './publicPath';
+import { isResolvexPath, resolvexBasename } from './resolvex/paths';
+import { ResolvexApp } from './resolvex/ResolvexApp';
 
 /** Shared cookie/OIDC fetch for boot helpers and `<TrueForgeUI server />`. */
 const authAwareFetch = createAuthAwareFetch();
@@ -177,6 +179,17 @@ export function App() {
     return (
       <ThemeProvider theme={appTheme}>
         <GetStartedScreen />
+      </ThemeProvider>
+    );
+  }
+
+  // ResolveX owns a sibling router; it shares the auth probe above but not the
+  // chat boot (`listModels`/`getCapabilities`), which is TrueForge-specific.
+  // Only 'authenticated' is left here — the branches above returned otherwise.
+  if (isResolvexPath()) {
+    return (
+      <ThemeProvider theme={appTheme}>
+        <ResolvexApp basename={resolvexBasename(routerBasename)} />
       </ThemeProvider>
     );
   }
