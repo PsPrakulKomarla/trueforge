@@ -18,6 +18,7 @@ import { createMcpOAuthRouter } from './apis/mcpOAuth';
 import { createMcpServersRouter } from './apis/mcpServers';
 import { createModelsRouter } from './apis/models';
 import { createPermissionsRouter } from './apis/permissions';
+import { createResolvexRouter } from './apis/resolvex';
 import { createScheduleExecutionRouter, createSchedulesRouter } from './apis/schedules';
 import { createInternalMetricsRouter } from './apis/sessionMetrics';
 import { createInternalSessionsRouter, createSessionsRouter } from './apis/sessions';
@@ -51,6 +52,7 @@ import type { IWebSearchProviderStore } from './db/webSearchProviderStore';
 import { createClientCertificateMiddleware } from './http/tls';
 import type { IOAuthTokenStore } from './mcp/auth/types';
 import { PACKAGE_VERSION } from './packageVersion';
+import { resolvexSettings } from './resolvex/config';
 import { OPENAPI_DOCUMENT_TAGS } from './routes/openapiTags';
 import type { ActiveTurnRegistry } from './runtime/activeTurns';
 import type { EventSubscriptionRegistry } from './runtime/event-subscription';
@@ -350,6 +352,13 @@ export function createServerApp<TTransaction>(deps: ServerDeps<TTransaction>) {
       authMiddleware,
     ),
   );
+  const resolveXSettings = resolvexSettings(configuration);
+  if (resolveXSettings.enabled) {
+    app.route(
+      '/api/v1/resolvex',
+      withAuth(createResolvexRouter({ resolveRequestContext, settings: resolveXSettings }), authMiddleware),
+    );
+  }
   app.route(
     '/api/internal/schedules',
     withAuth(createScheduleExecutionRouter(scheduleTurnDeps), scheduleExecutionAuthMiddleware),

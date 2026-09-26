@@ -27,7 +27,7 @@ export function createInMemoryIncidentStore(): IncidentStore {
       return structuredClone(next);
     },
     list() {
-      return [...incidents.values()].map(structuredClone);
+      return [...incidents.values()].map(incident => structuredClone(incident));
     },
   };
 }

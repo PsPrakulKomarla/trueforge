@@ -55,6 +55,8 @@ export interface DevOpsTool {
   requiredPermissions: string[];
   /** JSON Schema of the input, advertised to the planner and the UI. */
   inputSchema: Record<string, unknown>;
+  /** Original schema used to validate arguments at the MCP boundary. */
+  schema: z.ZodType;
   execute: (rawArgs: unknown, ctx: ToolContext) => Promise<ToolResult>;
   /** Pre-flight check (target exists, integration reachable). Defaults to ok. */
   validate?: (rawArgs: unknown, ctx: ToolContext) => Promise<ToolValidation>;
@@ -94,6 +96,7 @@ export function defineDevOpsTool<TArgs>(config: {
     risk: config.risk,
     requiredPermissions: [...(config.requiredPermissions ?? [])],
     inputSchema: config.schema.toJSONSchema({ io: 'input' }),
+    schema: config.schema,
     execute: (rawArgs, ctx) => config.execute(parse(rawArgs), ctx),
   };
   if (config.validate !== undefined) {

@@ -11,6 +11,7 @@ export enum OpenApiTag {
   AGENTS = 'Agents',
   SCHEDULES = 'Schedules',
   AGENT_SESSIONS = 'Agent Sessions',
+  RESOLVEX = 'ResolveX',
 }
 
 /** Document-level tag order for `/api/v1/docs` and Mintlify. */
@@ -26,4 +27,5 @@ export const OPENAPI_DOCUMENT_TAGS: { name: OpenApiTag }[] = [
   { name: OpenApiTag.AGENTS },
   { name: OpenApiTag.SCHEDULES },
   { name: OpenApiTag.AGENT_SESSIONS },
+  { name: OpenApiTag.RESOLVEX },
 ];
