@@ -120,3 +120,6 @@ export { executeResolveXInvestigation, type ResolveXExecutionResult, type Resolv
 export { ResolveXExecutionSchema, ResolveXExecutionStateSchema, assertExecutionTransition, canTransitionExecution, decideRecovery, type ResolveXExecution, type ResolveXExecutionState, type RecoveryDecision } from './domain/execution';
 export { buildRecommendation, extractResolutionRecord, findSimilarIncidents, similarity, type SimilarIncident, type SimilaritySignal, type ResolutionRecord, type RemediationRecommendation } from './services/incidentMemory';
 export { addHypothesis, buildInvestigationContext, hasRepeatedToolCall, rankHypothesis, type HypothesisStatus, type InvestigationContext, type InvestigationHypothesis } from './services/investigationOrchestrator';
+export { createDevOpsProviderRegistry, type DevOpsProviderRegistry } from './providers/registry';
+export { createUnavailableProvider } from './providers/unavailableProvider';
+export { PROVIDER_CAPABILITIES, unavailableResult, unsupportedResult, type DevOpsProvider, type EnvironmentContext, type ProviderCapability, type ProviderResult, type ProviderStatus } from './providers/provider';

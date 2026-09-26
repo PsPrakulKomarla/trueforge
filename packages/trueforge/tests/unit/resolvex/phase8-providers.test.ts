@@ -1,0 +1,4 @@
+import { createDevOpsProviderRegistry } from '../../../src/resolvex/providers/registry';
+import { createUnavailableProvider } from '../../../src/resolvex/providers/unavailableProvider';
+test('provider registry exposes capabilities and health without globals', async () => { const registry = createDevOpsProviderRegistry([createUnavailableProvider('kubernetes', ['read_health'])]); expect(registry.has('kubernetes')).toBe(true); expect(registry.capabilities('kubernetes')).toEqual(['read_health']); expect((await registry.health())[0]?.available).toBe(false); });
+test('unconfigured providers never fabricate data', async () => { const provider = createUnavailableProvider('observability', ['read_metrics']); const result = await provider.getMetrics!({ provider: 'observability', service: 'payment-api' }); expect(result.status).toBe('unavailable'); });
