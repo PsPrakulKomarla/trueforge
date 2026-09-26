@@ -1,12 +1,173 @@
-export type GraphNodeKind = 'service' | 'database' | 'cache' | 'queue' | 'deployment' | 'repository' | 'external_api' | 'infrastructure';
-export type GraphRelation = 'depends_on' | 'calls' | 'stores_data_in' | 'publishes_to' | 'consumes_from' | 'deployed_by' | 'owned_by' | 'affects' | 'caused_by';
-export type GraphNode = { id: string; name: string; kind: GraphNodeKind; metadata: Record<string, unknown> };
-export type GraphEdge = { from: string; to: string; relation: GraphRelation; metadata: Record<string, unknown> };
-export type RelevantGraphNode = GraphNode & { distance: number; reason: string };
-export interface ServiceGraph { addNode(node: GraphNode): void; addEdge(edge: GraphEdge): void; getNode(id: string): GraphNode | undefined; getNeighbors(id: string, relation?: GraphRelation): GraphNode[]; getDependencies(id: string): GraphNode[]; getDependents(id: string): GraphNode[]; findPath(from: string, to: string): string[] | undefined; relevantTo(id: string, depth?: number): RelevantGraphNode[]; nodes(): GraphNode[]; edges(): GraphEdge[]; }
-export function createServiceGraph(initialNodes: GraphNode[] = [], initialEdges: GraphEdge[] = []): ServiceGraph {
-  const nodes = new Map(initialNodes.map(node => [node.id, node])); const edges = [...initialEdges];
-  const outgoing = (id: string, relation?: GraphRelation) => edges.filter(edge => edge.from === id && (!relation || edge.relation === relation)).map(edge => nodes.get(edge.to)).filter((node): node is GraphNode => !!node);
-  return { addNode: node => void nodes.set(node.id, node), addEdge: edge => { if (!nodes.has(edge.from) || !nodes.has(edge.to)) throw new Error('Graph edge references unknown node'); edges.push(edge); }, getNode: id => nodes.get(id), getNeighbors: outgoing, getDependencies: id => outgoing(id, 'depends_on'), getDependents: id => edges.filter(e => e.to === id && e.relation === 'depends_on').map(e => nodes.get(e.from)).filter((n): n is GraphNode => !!n), findPath(from, to) { const q = [[from]]; const seen = new Set([from]); while (q.length) { const path = q.shift()!; if (path.at(-1) === to) return path; for (const n of outgoing(path.at(-1)!)) if (!seen.has(n.id)) { seen.add(n.id); q.push([...path, n.id]); } } return undefined; }, relevantTo(id, depth = 2) { const out: RelevantGraphNode[] = []; const q: Array<[string, number]> = [[id, 0]]; const seen = new Set([id]); while (q.length) { const [current, distance] = q.shift()!; if (distance) { const node = nodes.get(current); if (node) out.push({ ...node, distance, reason: `Connected to ${id} through the dependency graph` }); } if (distance >= depth) continue; for (const n of outgoing(current)) if (!seen.has(n.id)) { seen.add(n.id); q.push([n.id, distance + 1]); } } return out; }, nodes: () => [...nodes.values()], edges: () => [...edges] };
+import { z } from 'zod';
+
+export const NodeTypeSchema = z.enum(['service', 'deployment', 'database', 'queue', 'external', 'infrastructure']);
+export type NodeType = z.infer<typeof NodeTypeSchema>;
+
+export const GraphNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: NodeTypeSchema,
+    name: z.string().min(1),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .openapi('ResolvexGraphNode');
+export type GraphNode = z.infer<typeof GraphNodeSchema>;
+
+export const EdgeRelationshipSchema = z.enum(['depends_on', 'deployed_to', 'uses', 'connected_to', 'related']);
+export type EdgeRelationship = z.infer<typeof EdgeRelationshipSchema>;
+
+export const GraphEdgeSchema = z
+  .object({
+    source: z.string().min(1),
+    target: z.string().min(1),
+    relationship: EdgeRelationshipSchema,
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .openapi('ResolvexGraphEdge');
+export type GraphEdge = z.infer<typeof GraphEdgeSchema>;
+
+export const GraphPathSchema = z
+  .object({ nodes: z.array(GraphNodeSchema), edges: z.array(GraphEdgeSchema) })
+  .openapi('ResolvexGraphPath');
+export type GraphPath = z.infer<typeof GraphPathSchema>;
+
+export interface ServiceGraph {
+  readonly nodes: ReadonlyMap<string, GraphNode>;
+  readonly edges: ReadonlyMap<string, GraphEdge>;
+  addNode(node: GraphNode): void;
+  addEdge(edge: GraphEdge): void;
+  getNode(id: string): GraphNode | undefined;
+  getNodes(): GraphNode[];
+  getNeighbors(id: string): GraphNode[];
+  getDependencies(id: string): GraphNode[];
+  getDependents(id: string): GraphNode[];
+  findPath(source: string, target: string): GraphPath | undefined;
+  getRelatedNodes(id: string): GraphNode[];
+  toJSON(): { nodes: GraphNode[]; edges: GraphEdge[] };
 }
-export function createDemoServiceGraph(): ServiceGraph { const g = createServiceGraph([['payment-api','Payment API','service'],['postgresql','PostgreSQL','database'],['redis','Redis','cache'],['payment-worker','Payment Worker','service'],['deployment-1.8.4','Deployment 1.8.4','deployment'],['payment-provider','External Payment Provider','external_api']].map(([id,name,kind]) => ({ id, name, kind: kind as GraphNodeKind, metadata: {} }))); for (const [from,to,relation] of [['payment-api','postgresql','depends_on'],['payment-api','redis','depends_on'],['payment-api','payment-worker','calls'],['payment-api','deployment-1.8.4','deployed_by'],['payment-api','payment-provider','calls'],['payment-worker','redis','depends_on']] as GraphEdge['relation'][][]) g.addEdge({ from, to, relation, metadata: {} }); return g; }
+
+function edgeKey(edge: GraphEdge): string {
+  return `${edge.source}->${edge.target}::${edge.relationship}`;
+}
+
+export function createServiceGraph(): ServiceGraph {
+  const nodes = new Map<string, GraphNode>();
+  const edges = new Map<string, GraphEdge>();
+  const adjacency = new Map<string, Set<string>>();
+
+  function link(source: string, target: string): void {
+    let sourceNeighbors = adjacency.get(source);
+    if (sourceNeighbors === undefined) {
+      sourceNeighbors = new Set();
+      adjacency.set(source, sourceNeighbors);
+    }
+    let targetNeighbors = adjacency.get(target);
+    if (targetNeighbors === undefined) {
+      targetNeighbors = new Set();
+      adjacency.set(target, targetNeighbors);
+    }
+    sourceNeighbors.add(target);
+    targetNeighbors.add(source);
+  }
+
+  return {
+    nodes,
+    edges,
+    addNode(node) {
+      nodes.set(node.id, structuredClone(node));
+    },
+    addEdge(edge) {
+      if (!nodes.has(edge.source) || !nodes.has(edge.target)) {
+        throw new Error(`Graph edge endpoints must exist: ${edge.source} -> ${edge.target}`);
+      }
+      const copy = structuredClone(edge);
+      edges.set(edgeKey(copy), copy);
+      link(copy.source, copy.target);
+    },
+    getNode(id) {
+      const node = nodes.get(id);
+      return node === undefined ? undefined : structuredClone(node);
+    },
+    getNodes() {
+      return [...nodes.values()].map(node => structuredClone(node));
+    },
+    getNeighbors(id) {
+      const ids = adjacency.get(id);
+      return ids === undefined
+        ? []
+        : [...ids].flatMap(neighborId => {
+            const node = nodes.get(neighborId);
+            return node === undefined ? [] : [structuredClone(node)];
+          });
+    },
+    getDependencies(id) {
+      return [...edges.values()]
+        .filter(edge => edge.source === id && (edge.relationship === 'depends_on' || edge.relationship === 'uses'))
+        .flatMap(edge => {
+          const node = nodes.get(edge.target);
+          return node === undefined ? [] : [structuredClone(node)];
+        });
+    },
+    getDependents(id) {
+      return [...edges.values()]
+        .filter(edge => edge.target === id && (edge.relationship === 'depends_on' || edge.relationship === 'uses'))
+        .flatMap(edge => {
+          const node = nodes.get(edge.source);
+          return node === undefined ? [] : [structuredClone(node)];
+        });
+    },
+    findPath(source, target) {
+      const start = nodes.get(source);
+      if (start === undefined) {
+        return undefined;
+      }
+      if (source === target) {
+        return { nodes: [structuredClone(start)], edges: [] };
+      }
+      const visited = new Set([source]);
+      const queue: { id: string; path: string[]; edges: GraphEdge[] }[] = [{ id: source, path: [source], edges: [] }];
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (current === undefined) {
+          break;
+        }
+        for (const neighborId of adjacency.get(current.id) ?? []) {
+          if (visited.has(neighborId)) {
+            continue;
+          }
+          visited.add(neighborId);
+          const edge = [...edges.values()].find(
+            candidate =>
+              (candidate.source === current.id && candidate.target === neighborId) ||
+              (candidate.source === neighborId && candidate.target === current.id),
+          );
+          const node = nodes.get(neighborId);
+          if (edge === undefined || node === undefined) {
+            continue;
+          }
+          const path = [...current.path, neighborId];
+          const pathEdges = [...current.edges, structuredClone(edge)];
+          if (neighborId === target) {
+            const pathNodes = path.flatMap(id => {
+              const pathNode = nodes.get(id);
+              return pathNode === undefined ? [] : [structuredClone(pathNode)];
+            });
+            return pathNodes.length === path.length ? { nodes: pathNodes, edges: pathEdges } : undefined;
+          }
+          queue.push({ id: neighborId, path, edges: pathEdges });
+        }
+      }
+      return undefined;
+    },
+    getRelatedNodes(id) {
+      const node = nodes.get(id);
+      return node === undefined ? this.getNeighbors(id) : [structuredClone(node), ...this.getNeighbors(id)];
+    },
+    toJSON() {
+      return {
+        nodes: [...nodes.values()].map(node => structuredClone(node)),
+        edges: [...edges.values()].map(edge => structuredClone(edge)),
+      };
+    },
+  };
+}

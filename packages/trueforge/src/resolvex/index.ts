@@ -42,6 +42,8 @@ export {
   DiagnosisSchema,
   EvidenceKindSchema,
   EvidenceRecordSchema,
+  GraphEvidenceDirectionSchema,
+  GraphEvidenceSchema,
   HypothesisSchema,
   IncidentSchema,
   IncidentSummarySchema,
@@ -58,6 +60,7 @@ export {
   type Diagnosis,
   type EvidenceKind,
   type EvidenceRecord,
+  type GraphEvidence,
   type Hypothesis,
   type Incident,
   type IncidentSummary,
@@ -87,12 +90,30 @@ export {
 
 export type { AIGenerateRequest, AIProvider, AIStreamEvent, AIStructuredRequest, AITextResult } from './ai/provider';
 
+export { createResolvexAgentDefinition, type ResolvexGraphContext } from './agent';
+export { DEMO_TENANT_ID, createDemoServiceGraph } from './graph/demoTopology';
+export { createInMemoryGraphStore, type GraphStore } from './graph/graphStore';
+export {
+  EdgeRelationshipSchema,
+  GraphEdgeSchema,
+  GraphNodeSchema,
+  GraphPathSchema,
+  NodeTypeSchema,
+  createServiceGraph,
+  type EdgeRelationship,
+  type GraphEdge,
+  type GraphNode,
+  type GraphPath,
+  type NodeType,
+  type ServiceGraph,
+} from './graph/serviceGraph';
 export { createIncidentService } from './services/incidentService';
-export { createInMemoryIncidentStore, type IncidentStore } from './store/incidentStore';
+export {
+  IncidentNotFoundError,
+  IncidentStoreConflictError,
+  createInMemoryIncidentStore,
+  type IncidentStore,
+} from './store/incidentStore';
 export { createDemoEnvironment, createDemoTools, type DemoEnvironment } from './tools/demoTools';
-
-export { createPersistentIncidentStore } from './store/incidentStore';
-export { createServiceGraph, createDemoServiceGraph, GraphNodeKindSchema, GraphRelationSchema, GraphNodeSchema, GraphEdgeSchema, type ServiceGraph, type GraphNode, type GraphEdge, type RelevantGraphNode } from './graph/serviceGraph';
-export { createResolveXAgentDefinition } from './agent';
-export { createResolveXToolMCP, ResolveXToolMCP } from './tools/registryAdapter';
+export { ResolvexToolMCP, createResolvexToolMCP } from './tools/registryAdapter';
 export { executeResolveXInvestigation, type ResolveXExecutionResult, type ResolveXExecutionState } from './agentExecution';

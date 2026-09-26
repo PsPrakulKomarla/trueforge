@@ -1,25 +1,73 @@
-import { z } from 'zod';
-import { LocalToolMCP, defineTool, type ToolDefinition } from '@truefoundry/trueforge-core/core/mcp/LocalToolMCP';
-import type { AgentTracing } from '@truefoundry/trueforge-core/core/tracing/AgentTracing';
-import { toolResultResponse, type CallToolResponse } from '@truefoundry/trueforge-core/core/mcp/IMCPServer';
-import type { ApprovalDecision } from '@truefoundry/trueforge-core/core/events/schema';
-import type { DevOpsTool, DevOpsToolRegistry, ToolContext } from './devopsTool';
+import type { CallToolRequest } from '@modelcontextprotocol/sdk/types.js';
+import {
+  LocalToolMCP,
+  NOOP_AGENT_TRACING,
+  defineTool,
+  toolResultResponse,
+  type AgentTracing,
+  type ToolDefinition,
+} from '@truefoundry/trueforge-core/core';
+import type { ResolvexSettings } from '../config';
+import { approvalRequirement } from '../policies/approvalPolicy';
+import { ToolInputValidationError, type DevOpsToolRegistry, type ToolContext } from './devopsTool';
 
-export class ResolveXToolMCP extends LocalToolMCP {
+export class ResolvexToolMCP extends LocalToolMCP {
   readonly name = 'resolvex';
   readonly displayName = 'ResolveX DevOps tools';
-  constructor(private readonly registry: DevOpsToolRegistry, tracing: AgentTracing) { super({ tracing }); }
-  protected getTools(): ToolDefinition[] {
-    return this.registry.list().map(tool => defineTool({ name: tool.id, description: tool.description, schema: z.record(z.string(), z.unknown()), handler: (input, decision) => this.execute(tool, input, decision) }));
+
+  constructor(
+    private readonly options: {
+      registry: DevOpsToolRegistry;
+      settings: ResolvexSettings;
+      context: () => ToolContext;
+      tracing?: AgentTracing | undefined;
+    },
+  ) {
+    super({ tracing: options.tracing ?? NOOP_AGENT_TRACING });
   }
-  private async execute(tool: DevOpsTool, input: Record<string, unknown>, decision?: ApprovalDecision): Promise<CallToolResponse> {
-    if (tool.risk !== 'low' && !decision) {
-      return { approvalRequired: { tool_info: { type: 'truefoundry-system', mcp_server_id: this.id, mcp_server_name: this.name, original_tool_name: tool.id, is_approval_required: true } } };
-    }
-    if (decision?.status === 'deny') return toolResultResponse({ text: JSON.stringify({ error: decision.reason ?? 'Tool call denied' }), isError: true });
-    const context: ToolContext = { incidentId: String(input.incident_id ?? 'agent-session'), correlationId: String(input.correlation_id ?? 'agent-session'), tenantId: String(input.tenant_id ?? 'default'), signal: new AbortController().signal };
-    try { const result = await tool.execute(input, context); return toolResultResponse({ text: JSON.stringify({ summary: result.summary, output: result.output }) }); } catch (error) { return toolResultResponse({ text: JSON.stringify({ error: error instanceof Error ? error.message : 'Tool execution failed' }), isError: true }); }
+
+  protected override getTools(): ToolDefinition[] {
+    return this.options.registry.list().map(tool =>
+      defineTool({
+        name: tool.id,
+        description: `${tool.description} Risk: ${tool.risk}.`,
+        schema: tool.schema,
+        handler: async (args, decision) => {
+          if (decision?.status === 'deny') {
+            return toolResultResponse({ text: JSON.stringify({ error: 'User denied tool call' }), isError: true });
+          }
+          if (approvalRequirement(tool.risk, this.options.settings) === 'explicit' && decision?.status !== 'allow') {
+            return {
+              approvalRequired: {
+                tool_info: await this.toolCallInfo({ name: tool.id }),
+              },
+            };
+          }
+          try {
+            const result = await tool.execute(args, this.options.context());
+            return toolResultResponse({ text: JSON.stringify({ output: result.output, summary: result.summary }) });
+          } catch (error) {
+            const message = error instanceof ToolInputValidationError ? error.message : 'Tool execution failed';
+            return toolResultResponse({ text: JSON.stringify({ error: message }), isError: true });
+          }
+        },
+      }),
+    );
+  }
+
+  override async toolCallInfo(
+    params: CallToolRequest['params'],
+    resolveUnderlyingTool?: boolean,
+  ): Promise<Awaited<ReturnType<LocalToolMCP['toolCallInfo']>>> {
+    const info = await super.toolCallInfo(params, resolveUnderlyingTool);
+    const tool = this.options.registry.get(params.name);
+    return {
+      ...info,
+      is_approval_required: tool !== undefined && approvalRequirement(tool.risk, this.options.settings) === 'explicit',
+    };
   }
 }
 
-export function createResolveXToolMCP(registry: DevOpsToolRegistry, tracing: AgentTracing): ResolveXToolMCP { return new ResolveXToolMCP(registry, tracing); }
+export function createResolvexToolMCP(options: ConstructorParameters<typeof ResolvexToolMCP>[0]): ResolvexToolMCP {
+  return new ResolvexToolMCP(options);
+}

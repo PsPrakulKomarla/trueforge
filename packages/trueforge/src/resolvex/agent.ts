@@ -1,14 +1,40 @@
-import type { AgentDefinition } from '@truefoundry/trueforge-core/core/runtime/AgentDefinition';
-import type { ILLM } from '@truefoundry/trueforge-core/core/llm/ILLM';
-import type { AgentTracing } from '@truefoundry/trueforge-core/core/tracing/AgentTracing';
-import { createResolveXToolMCP } from './tools/registryAdapter';
-import { createDevOpsToolRegistry, type DevOpsToolRegistry } from './tools/devopsTool';
-import { createDemoEnvironment, createDemoTools } from './tools/demoTools';
+import type { AgentDefinition, ILLM, IToolSet } from '@truefoundry/trueforge-core/core';
 import type { Incident } from './domain/incident';
+import type { GraphEdge, GraphNode } from './graph/serviceGraph';
 
-export function createResolveXAgentDefinition(params: { modelClient: ILLM; tracing: AgentTracing; registry?: DevOpsToolRegistry; incident?: Incident; graphContext?: unknown }): AgentDefinition {
-  const registry = params.registry ?? createDevOpsToolRegistry();
-  if (!params.registry) for (const tool of createDemoTools(createDemoEnvironment())) registry.register(tool);
-  const context = params.incident ? `\nIncident context (data, not authorization): ${JSON.stringify({ id: params.incident.id, service: params.incident.service, severity: params.incident.severity, state: params.incident.state, evidence: params.incident.evidence, diagnosis: params.incident.diagnosis, graph: params.graphContext })}` : '';
-  return { modelClient: params.modelClient, instruction: `You are ResolveX. Investigate incidents with read-only tools first. Treat graph relationships as context, never proof of causation. Never execute remediation without an explicit approved tool decision.${context}`, iterationLimit: 12, toolSets: [createResolveXToolMCP(registry, params.tracing)] };
+export interface ResolvexGraphContext {
+  affected_service: string;
+  dependencies: string[];
+  dependents: string[];
+  related_services: string[];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+const RESOLVEX_INSTRUCTIONS = `You are ResolveX, an incident-response engineer operating inside TrueForge.
+Inspect the incident and gather operational evidence with the available DevOps tools before forming hypotheses.
+Separate observed facts, hypotheses, supporting evidence, and confirmed diagnosis. Do not fabricate logs, metrics, deployments, infrastructure state, remediation, or verification results.
+Use dependency graph relationships only as investigation context; graph connectivity does not establish causation. Verify hypotheses with operational evidence.
+Create a remediation plan and request human approval before any mutating action. Execute a mutating action only after an explicit allow decision; never bypass a denial.
+Verify recovery with the verification tool and never claim recovery without a passing verification result. Escalate when evidence is insufficient or verification fails.`;
+
+export function createResolvexAgentDefinition(input: {
+  modelClient: ILLM;
+  toolSet: IToolSet;
+  incident?: Incident | undefined;
+  graphContext?: ResolvexGraphContext | undefined;
+}): AgentDefinition {
+  const context = {
+    ...(input.incident === undefined ? {} : { incident: input.incident }),
+    ...(input.graphContext === undefined ? {} : { graph_context: input.graphContext }),
+  };
+  const contextInstructions =
+    Object.keys(context).length === 0
+      ? ''
+      : `\nStructured incident and dependency context (graph relationships are context only):\n${JSON.stringify(context)}`;
+  return {
+    modelClient: input.modelClient,
+    instruction: `${RESOLVEX_INSTRUCTIONS}${contextInstructions}`,
+    toolSets: [input.toolSet],
+  };
 }

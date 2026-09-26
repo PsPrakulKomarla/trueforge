@@ -31,6 +31,7 @@ import { SqliteSandboxProviderStore } from '../src/db/sqlite/sandbox-provider-st
 import { SqliteScheduleStore } from '../src/db/sqlite/schedule-store/SqliteScheduleStore';
 import { SqliteSessionMetricsStore } from '../src/db/sqlite/session-metrics/SqliteSessionMetricsStore';
 import { SqliteSkillStore } from '../src/db/sqlite/skill-store/SqliteSkillStore';
+import { SqliteResolvexStore } from '../src/db/sqlite/SqliteResolvexStore';
 import { SqliteOAuthTokenStore } from '../src/db/sqlite/token-store/SqliteOAuthTokenStore';
 import { SqliteWebSearchProviderStore } from '../src/db/sqlite/web-search-provider-store/SqliteWebSearchProviderStore';
 import { ActiveTurnRegistry } from '../src/runtime/activeTurns';
@@ -89,6 +90,8 @@ const app = createServerApp({
   turnSkillsResolverStore: skillStore,
   withTransaction: callback => db.transaction().execute(callback),
   scheduleStore: new SqliteScheduleStore(db),
+  resolveIncidentStore: tenantId => new SqliteResolvexStore(db, tenantId),
+  resolveGraphStore: tenantId => new SqliteResolvexStore(db, tenantId),
   tokenStore,
   sessionStore,
   sessionMetricsStore: new SqliteSessionMetricsStore(db),

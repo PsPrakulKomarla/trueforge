@@ -70,6 +70,7 @@ export type {
 } from './mcp/IMCPServer';
 export { LocalToolMCP, defineTool } from './mcp/LocalToolMCP';
 export type { ToolDefinition } from './mcp/LocalToolMCP';
+export { NOOP_AGENT_TRACING } from './tracing/NoopAgentTracing';
 
 // Remote MCP server, split into a shared, policy-free connection (`RemoteMCP`) and a per-agent policy
 // wrapper (`ToolSet`). `RemoteMCP` connects itself from a `url` + `headers`; the networking helpers

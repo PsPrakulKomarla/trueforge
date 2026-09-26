@@ -4,14 +4,16 @@ import type { AgentThreadExecutionEvent, AgentThreadExecutionResult } from '@tru
 import type { AgentTracing } from '@truefoundry/trueforge-core/core/tracing/AgentTracing';
 import type { ITurnResourceResolver } from '@truefoundry/trueforge-core/agent-session';
 import type { AgentSpec } from '@truefoundry/trueforge-core/agent-session';
+import configuration from '../config';
 import type { ILLM } from '@truefoundry/trueforge-core/core/llm/ILLM';
 import type { Logger } from 'winston';
 import type { Incident } from './domain/incident';
 import type { ServiceGraph } from './graph/serviceGraph';
-import { createResolveXAgentDefinition } from './agent';
+import { createResolvexAgentDefinition } from './agent';
 import { createDevOpsToolRegistry } from './tools/devopsTool';
 import { createDemoEnvironment, createDemoTools } from './tools/demoTools';
-import { createResolveXToolMCP } from './tools/registryAdapter';
+import { createResolvexToolMCP } from './tools/registryAdapter';
+import { resolvexSettings } from './config';
 
 export type ResolveXExecutionState = 'completed' | 'awaiting_approval' | 'failed';
 export interface ResolveXExecutionResult { state: ResolveXExecutionState; thread_id: string; events: AgentThreadExecutionEvent[]; runtime: AgentThreadExecutionResult; }
@@ -34,8 +36,8 @@ export async function executeResolveXInvestigation(input: {
   for (const tool of createDemoTools(createDemoEnvironment())) registry.register(tool);
   const threadId = `resolvex-${input.incident.id}`;
   const graphContext = { affected: input.graph.getNode(input.incident.service), dependencies: input.graph.getDependencies(input.incident.service), dependents: input.graph.getDependents(input.incident.service), related: input.graph.relevantTo(input.incident.service, 2), nodes: input.graph.nodes(), edges: input.graph.edges() };
-  const resolveXTools = createResolveXToolMCP(registry, tracing);
-  const definition = resolved ? { ...resolved.definition, toolSets: [...(resolved.definition.toolSets ?? []), resolveXTools], instruction: `${resolved.definition.instruction ?? ''}\nResolveX incident context: ${JSON.stringify({ incident: input.incident, graph: graphContext })}` } : createResolveXAgentDefinition({ modelClient: input.modelClient!, tracing, registry, incident: input.incident, graphContext });
+  const resolveXTools = createResolvexToolMCP({ registry, settings: resolvexSettings(configuration), tracing, context: () => ({ incidentId: input.incident.id, correlationId: input.incident.correlation_id, tenantId: 'demo', signal: input.signal ?? new AbortController().signal }) });
+  const definition = resolved ? { ...resolved.definition, toolSets: [...(resolved.definition.toolSets ?? []), resolveXTools], instruction: `${resolved.definition.instruction ?? ''}\nResolveX incident context: ${JSON.stringify({ incident: input.incident, graph: graphContext })}` } : createResolvexAgentDefinition({ modelClient: input.modelClient!, toolSet: resolveXTools, incident: input.incident, graphContext: { affected_service: input.incident.service, dependencies: graphContext.dependencies.map(node => node.id), dependents: graphContext.dependents.map(node => node.id), related_services: graphContext.related.map(node => node.id), nodes: graphContext.nodes, edges: graphContext.edges } });
   const thread = new AgentThread({ definition, threadId, title: `ResolveX incident ${input.incident.id}`, tracing, logger });
   const orchestrator = new AgentThreadOrchestrator({ agentThreads: new Map([[threadId, thread]]), createDynamicSubAgentThread: async () => { throw new Error('ResolveX sub-agents are not enabled in the controlled Phase 4 workflow'); }, tracing, logger });
   const prompt = `Investigate incident ${input.incident.id}. Use the available read-only tools and graph context to collect only relevant evidence. Produce a structured diagnosis and remediation proposal, but do not execute approval-required remediation. The incident store remains authoritative.`;
