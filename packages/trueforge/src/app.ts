@@ -9,6 +9,8 @@ import { bodyLimit } from 'hono/body-limit';
 import { HTTPException } from 'hono/http-exception';
 import type { Configuration } from 'openid-client';
 import type { Logger } from 'winston';
+import { createInMemoryIncidentStore } from './resolvex/store/incidentStore';
+import { resolvexSettings } from './resolvex/config';
 import { createAgentImportRouter } from './apis/agentImport';
 import { createAgentsRouter } from './apis/agents';
 import { createAuthRouter } from './apis/auth';
@@ -18,6 +20,7 @@ import { createMcpOAuthRouter } from './apis/mcpOAuth';
 import { createMcpServersRouter } from './apis/mcpServers';
 import { createModelsRouter } from './apis/models';
 import { createPermissionsRouter } from './apis/permissions';
+import { createResolvexRouter } from './apis/resolvex';
 import { createScheduleExecutionRouter, createSchedulesRouter } from './apis/schedules';
 import { createInternalMetricsRouter } from './apis/sessionMetrics';
 import { createInternalSessionsRouter, createSessionsRouter } from './apis/sessions';
@@ -253,6 +256,10 @@ export function createServerApp<TTransaction>(deps: ServerDeps<TTransaction>) {
   app.use('*', createRequestBodyLimitMiddleware(configuration.MAX_REQUEST_BODY_BYTES));
 
   app.get('/healthz', c => c.json({ status: 'ok', version: PACKAGE_VERSION }));
+
+  // ResolveX remains behind the same TrueForge authentication boundary as the other APIs.
+  // The store is injectable in future server wiring; this fallback preserves the demo-safe API.
+  app.route('/api/resolvex', withAuth(createResolvexRouter({ store: createInMemoryIncidentStore(), settings: resolvexSettings(configuration) }), authMiddleware));
 
   app.route(
     '/api/v1/auth',
