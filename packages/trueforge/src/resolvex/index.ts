@@ -132,3 +132,4 @@ export { assessRisk, calculateBaseline, calculateBlastRadius, createPrediction, 
 export { assertActionTransition, canTransitionAction, decideAfterVerification, evaluateAction, planIdentity, transitionExecution, validatePlan, RemediationActionSchema, type ActionState, type RemediationAction, type RemediationPlan } from './services/remediationOrchestrator';
 export { extractIncidentMemory, retrieveMemory, type IncidentMemory, type MemoryConfirmation, type MemoryMatch } from './services/historicalMemory';
 export { createCircuitBreaker, degradedMode, retrySafe, ResolveXOperationalError, type CircuitBreaker, type CircuitState, type ResolveXErrorCode } from './services/operationalSafety';
+export { buildDecisionTrace, type DecisionTraceEntry, type DecisionTraceStage, type Explanation } from './services/decisionTrace';
