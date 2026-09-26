@@ -2,6 +2,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { RequestErrorResponseSchema } from '../schemas/errors';
 import {
   CreateResolvexIncidentRequestSchema,
+  GetResolvexIncidentGraphResponseSchema,
   GetResolvexIncidentResponseSchema,
   ListResolvexIncidentsResponseSchema,
 } from '../schemas/resolvex';
@@ -83,6 +84,24 @@ export const getResolvexIncidentRoute = createRoute({
     200: {
       content: { 'application/json': { schema: GetResolvexIncidentResponseSchema } },
       description: 'The incident.',
+    },
+    ...commonErrors,
+  },
+});
+
+export const getResolvexIncidentGraphRoute = createRoute({
+  method: 'get',
+  path: '/incidents/{incident_id}/graph',
+  tags: [OpenApiTag.RESOLVEX],
+  summary: 'Get incident graph context',
+  description: 'Returns the affected service and its related dependency graph context.',
+  'x-fern-sdk-group-name': ['resolvex'],
+  'x-fern-sdk-method-name': 'get_graph',
+  request: { params: ResolvexIncidentIdParamsSchema },
+  responses: {
+    200: {
+      content: { 'application/json': { schema: GetResolvexIncidentGraphResponseSchema } },
+      description: 'The incident graph context.',
     },
     ...commonErrors,
   },

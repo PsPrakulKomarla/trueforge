@@ -3,10 +3,17 @@ import { z } from 'zod';
 import { createResolvexRouter } from '../../src/apis/resolvex';
 import { STANDALONE_REQUEST_CONTEXT } from '../../src/auth/identity';
 import { createResolvexAgentDefinition } from '../../src/resolvex/agent';
+import { createDemoServiceGraph } from '../../src/resolvex/graph/demoTopology';
+import { createInMemoryGraphStore } from '../../src/resolvex/graph/graphStore';
+import { createInMemoryIncidentStore } from '../../src/resolvex/store/incidentStore';
 import { createDemoEnvironment, createDemoTools } from '../../src/resolvex/tools/demoTools';
 import { createDevOpsToolRegistry, defineDevOpsTool, type ToolContext } from '../../src/resolvex/tools/devopsTool';
 import { createResolvexToolMCP } from '../../src/resolvex/tools/registryAdapter';
-import { GetResolvexIncidentResponseSchema, ListResolvexIncidentsResponseSchema } from '../../src/schemas/resolvex';
+import {
+  GetResolvexIncidentGraphResponseSchema,
+  GetResolvexIncidentResponseSchema,
+  ListResolvexIncidentsResponseSchema,
+} from '../../src/schemas/resolvex';
 
 const settings = {
   enabled: true,
@@ -27,9 +34,27 @@ function jsonRequest(method: 'GET' | 'POST', body?: unknown): RequestInit {
 describe('ResolveX Phase 2 integration', () => {
   test('API exposes the incident lifecycle and scopes records by tenant', async () => {
     let tenantId = 'tenant-a';
+    const incidentStores = new Map<string, ReturnType<typeof createInMemoryIncidentStore>>();
+    const graphStores = new Map<string, ReturnType<typeof createInMemoryGraphStore>>();
     const router = createResolvexRouter({
       settings,
       resolveRequestContext: () => ({ ...STANDALONE_REQUEST_CONTEXT, tenant_id: tenantId }),
+      resolveIncidentStore: tenant => {
+        let store = incidentStores.get(tenant);
+        if (store === undefined) {
+          store = createInMemoryIncidentStore();
+          incidentStores.set(tenant, store);
+        }
+        return store;
+      },
+      resolveGraphStore: tenant => {
+        let store = graphStores.get(tenant);
+        if (store === undefined) {
+          store = createInMemoryGraphStore(createDemoServiceGraph());
+          graphStores.set(tenant, store);
+        }
+        return store;
+      },
     });
 
     const createdResponse = await router.request(
@@ -39,6 +64,12 @@ describe('ResolveX Phase 2 integration', () => {
     expect(createdResponse.status).toBe(201);
     const created = GetResolvexIncidentResponseSchema.parse(await createdResponse.json()).data;
     expect(created.state).toBe('detected');
+
+    const graphResponse = await router.request(`/incidents/${created.id}/graph`);
+    const graph = GetResolvexIncidentGraphResponseSchema.parse(await graphResponse.json()).data;
+    expect(graph.affected_node?.id).toBe('payment-api');
+    expect(graph.dependencies.map(node => node.id)).toContain('payment-db');
+    expect(graph.is_demo).toBe(true);
 
     const listResponse = await router.request('/incidents');
     expect(listResponse.status).toBe(200);
@@ -55,7 +86,10 @@ describe('ResolveX Phase 2 integration', () => {
     const investigatedResponse = await router.request(`/incidents/${created.id}/investigate`, jsonRequest('POST'));
     const investigated = GetResolvexIncidentResponseSchema.parse(await investigatedResponse.json()).data;
     expect(investigated.state).toBe('approval_required');
-    expect(investigated.evidence).toHaveLength(3);
+    expect(investigated.evidence).toHaveLength(4);
+    expect(investigated.evidence.find(evidence => evidence.kind === 'graph')?.summary).toContain('dependencies');
+    expect(investigated.graph_evidence.map(evidence => evidence.node_id)).toContain('payment-db');
+    expect(investigated.state).toBe('approval_required');
 
     const planResponse = await router.request(`/incidents/${created.id}/remediation-plan`, jsonRequest('POST'));
     expect(GetResolvexIncidentResponseSchema.parse(await planResponse.json()).data.plan?.id).toBe(

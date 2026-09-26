@@ -363,6 +363,35 @@ export interface OAuthPendingAuthorizationTable {
   created_at: string;
 }
 
+export interface ResolvexIncidentTable {
+  id: string;
+  tenant_id: string;
+  service: string;
+  severity: string;
+  priority: number;
+  state: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  document: JsonbColumn<Record<string, unknown>>;
+}
+
+export interface ResolvexGraphNodeTable {
+  id: string;
+  tenant_id: string;
+  type: string;
+  name: string;
+  metadata: JsonbColumn<Record<string, unknown>> | null;
+}
+
+export interface ResolvexGraphEdgeTable {
+  source_id: string;
+  target_id: string;
+  tenant_id: string;
+  relationship: string;
+  metadata: JsonbColumn<Record<string, unknown>> | null;
+}
+
 export interface Database {
   session: SessionTable;
   turn: TurnTable;
@@ -382,4 +411,7 @@ export interface Database {
   mcp_server: McpServerTable;
   oauth_token: OAuthTokenTable;
   oauth_pending_authorization: OAuthPendingAuthorizationTable;
+  resolvex_incident: ResolvexIncidentTable;
+  resolvex_graph_node: ResolvexGraphNodeTable;
+  resolvex_graph_edge: ResolvexGraphEdgeTable;
 }

@@ -53,6 +53,8 @@ import { createClientCertificateMiddleware } from './http/tls';
 import type { IOAuthTokenStore } from './mcp/auth/types';
 import { PACKAGE_VERSION } from './packageVersion';
 import { resolvexSettings } from './resolvex/config';
+import type { GraphStore } from './resolvex/graph/graphStore';
+import type { IncidentStore } from './resolvex/store/incidentStore';
 import { OPENAPI_DOCUMENT_TAGS } from './routes/openapiTags';
 import type { ActiveTurnRegistry } from './runtime/activeTurns';
 import type { EventSubscriptionRegistry } from './runtime/event-subscription';
@@ -203,6 +205,8 @@ export interface ServerDeps<TTransaction> {
   withTransaction: WithTransaction<TTransaction>;
   tokenStore: IOAuthTokenStore<TTransaction>;
   scheduleStore: IScheduleStore<TTransaction>;
+  resolveIncidentStore: (tenant_id: string) => IncidentStore;
+  resolveGraphStore: (tenant_id: string) => GraphStore;
   sessionStore: ISessionStore;
   sessionMetricsStore: ISessionMetricsStore;
   /** Persistence agent store (schedule runs resolve the bound agent without an HTTP caller). */
@@ -356,7 +360,15 @@ export function createServerApp<TTransaction>(deps: ServerDeps<TTransaction>) {
   if (resolveXSettings.enabled) {
     app.route(
       '/api/v1/resolvex',
-      withAuth(createResolvexRouter({ resolveRequestContext, settings: resolveXSettings }), authMiddleware),
+      withAuth(
+        createResolvexRouter({
+          resolveRequestContext,
+          settings: resolveXSettings,
+          resolveIncidentStore: deps.resolveIncidentStore,
+          resolveGraphStore: deps.resolveGraphStore,
+        }),
+        authMiddleware,
+      ),
     );
   }
   app.route(

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { defineDevOpsTool, type DevOpsTool, type ToolContext } from './devopsTool';
+import { defineDevOpsTool, type DevOpsTool } from './devopsTool';
 
 const serviceArgs = z.object({ service: z.string().default('payment-api') });
 const remediationArgs = z.object({
@@ -14,9 +14,6 @@ export function createDemoEnvironment(): DemoEnvironment {
   return { healthy: new Set() };
 }
 
-function name(ctx: ToolContext) {
-  return ctx.incidentId;
-}
 export function createDemoTools(environment: DemoEnvironment): DevOpsTool[] {
   const health = defineDevOpsTool({
     id: 'get_service_health',

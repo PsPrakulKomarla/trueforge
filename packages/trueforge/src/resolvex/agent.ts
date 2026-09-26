@@ -1,12 +1,14 @@
 import type { AgentDefinition, ILLM, IToolSet } from '@truefoundry/trueforge-core/core';
+import type { Incident } from './domain/incident';
+import type { GraphEdge, GraphNode } from './graph/serviceGraph';
 
 export interface ResolvexGraphContext {
   affected_service: string;
   dependencies: string[];
   dependents: string[];
   related_services: string[];
-  nodes: { id: string; type: string; name: string }[];
-  edges: { source: string; target: string; relationship: string }[];
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }
 
 const RESOLVEX_INSTRUCTIONS = `You are ResolveX, an incident-response engineer operating inside TrueForge.
@@ -19,15 +21,20 @@ Verify recovery with the verification tool and never claim recovery without a pa
 export function createResolvexAgentDefinition(input: {
   modelClient: ILLM;
   toolSet: IToolSet;
+  incident?: Incident | undefined;
   graphContext?: ResolvexGraphContext | undefined;
 }): AgentDefinition {
-  const graphInstructions =
-    input.graphContext === undefined
+  const context = {
+    ...(input.incident === undefined ? {} : { incident: input.incident }),
+    ...(input.graphContext === undefined ? {} : { graph_context: input.graphContext }),
+  };
+  const contextInstructions =
+    Object.keys(context).length === 0
       ? ''
-      : `\nStructured dependency context (context only, not proof of causation):\n${JSON.stringify(input.graphContext)}`;
+      : `\nStructured incident and dependency context (graph relationships are context only):\n${JSON.stringify(context)}`;
   return {
     modelClient: input.modelClient,
-    instruction: `${RESOLVEX_INSTRUCTIONS}${graphInstructions}`,
+    instruction: `${RESOLVEX_INSTRUCTIONS}${contextInstructions}`,
     toolSets: [input.toolSet],
   };
 }

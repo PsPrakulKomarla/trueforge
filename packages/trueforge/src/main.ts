@@ -90,6 +90,8 @@ import { serverTlsServeOptions } from './http/tls';
 import { createServerLogger, shouldColorize } from './logger';
 import type { IOAuthTokenStore } from './mcp/auth/types';
 import { PACKAGE_VERSION } from './packageVersion';
+import type { GraphStore } from './resolvex/graph/graphStore';
+import type { IncidentStore } from './resolvex/store/incidentStore';
 import { ActiveTurnRegistry } from './runtime/activeTurns';
 import { EventSubscriptionRegistry } from './runtime/event-subscription';
 import type { ConnectedRedis } from './runtime/redis';
@@ -119,6 +121,8 @@ interface ServerPersistence<TTransaction> {
   sessionMetricsStore: ISessionMetricsStore;
   tokenStore: IOAuthTokenStore<TTransaction>;
   scheduleStore: IScheduleStore<TTransaction>;
+  resolveIncidentStore: (tenant_id: string) => IncidentStore;
+  resolveGraphStore: (tenant_id: string) => GraphStore;
   mcpOAuthStore: IMcpServerWithAuthStore<TTransaction>;
   resolveModelProviderStore: (rc: RequestContext, runAsAgent?: AgentRecord) => IModelProviderStore<TTransaction>;
   resolveMcpServerStore: (
@@ -316,6 +320,7 @@ async function createStandalonePersistence(options: {
       import('./db/sqlite/web-search-provider-store/SqliteWebSearchProviderStore'),
       import('./db/sqlite/agent-store/SqliteAgentStore'),
       import('./db/sqlite/schedule-store/SqliteScheduleStore'),
+      import('./db/sqlite/SqliteResolvexStore'),
     ]),
   ]);
   const [
@@ -329,6 +334,7 @@ async function createStandalonePersistence(options: {
     { SqliteWebSearchProviderStore },
     { SqliteAgentStore },
     { SqliteScheduleStore },
+    { SqliteResolvexStore },
   ] = sqliteStores;
 
   const db = createSqliteDb(sqlitePath);
@@ -354,6 +360,8 @@ async function createStandalonePersistence(options: {
     mcpOAuthStore: mcpServerStore,
     tokenStore,
     scheduleStore: new SqliteScheduleStore(db),
+    resolveIncidentStore: tenantId => new SqliteResolvexStore(db, tenantId),
+    resolveGraphStore: tenantId => new SqliteResolvexStore(db, tenantId),
     resolveModelProviderStore: () => modelProviderStore,
     resolveMcpServerStore: () => mcpServerStore,
     resolveSandboxProviderStore: () => sandboxProviderStore,
@@ -409,6 +417,7 @@ async function createDistributedPersistence(options: {
       import('./db/postgres/web-search-provider-store/PostgresWebSearchProviderStore'),
       import('./db/postgres/agent-store/PostgresAgentStore'),
       import('./db/postgres/schedule-store/PostgresScheduleStore'),
+      import('./db/postgres/PostgresResolvexStore'),
     ]),
   ]);
   const [
@@ -422,6 +431,7 @@ async function createDistributedPersistence(options: {
     { PostgresWebSearchProviderStore },
     { PostgresAgentStore },
     { PostgresScheduleStore },
+    { PostgresResolvexStore },
   ] = postgresStores;
 
   logger.info('Connecting to Postgres');
@@ -509,6 +519,8 @@ async function createDistributedPersistence(options: {
     mcpOAuthStore: mcpServerWithAuthStore,
     tokenStore,
     scheduleStore: new PostgresScheduleStore(db),
+    resolveIncidentStore: tenantId => new PostgresResolvexStore(db, tenantId),
+    resolveGraphStore: tenantId => new PostgresResolvexStore(db, tenantId),
     resolveModelProviderStore,
     resolveMcpServerStore,
     resolveSandboxProviderStore,
@@ -546,6 +558,8 @@ async function createServerRuntime<TTransaction>(persistence: ServerPersistence<
     sessionMetricsStore,
     tokenStore,
     scheduleStore,
+    resolveIncidentStore,
+    resolveGraphStore,
     mcpOAuthStore,
     resolveImportAgentStore,
     agentStore,
@@ -651,6 +665,8 @@ async function createServerRuntime<TTransaction>(persistence: ServerPersistence<
     withTransaction,
     tokenStore,
     scheduleStore,
+    resolveIncidentStore,
+    resolveGraphStore,
     agentStore,
     turnSkillsResolverStore,
     sessionStore,

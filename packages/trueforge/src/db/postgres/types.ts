@@ -529,6 +529,35 @@ export interface OAuthPendingAuthorizationTable {
   created_at: Date;
 }
 
+export interface ResolvexIncidentTable {
+  id: string;
+  tenant_id: string;
+  service: string;
+  severity: string;
+  priority: number;
+  state: string;
+  version: number;
+  created_at: Date;
+  updated_at: Date;
+  document: JSONColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>>;
+}
+
+export interface ResolvexGraphNodeTable {
+  id: string;
+  tenant_id: string;
+  type: string;
+  name: string;
+  metadata: JSONColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>> | null;
+}
+
+export interface ResolvexGraphEdgeTable {
+  source_id: string;
+  target_id: string;
+  tenant_id: string;
+  relationship: string;
+  metadata: JSONColumnType<Record<string, unknown>, Record<string, unknown>, Record<string, unknown>> | null;
+}
+
 /**
  * Write-heat summary: `turn_thread` is the one deliberately-hot table with its hot
  * columns (`context_ids`, `current_context_usage`) isolated from the pointer-carried
@@ -561,4 +590,7 @@ export interface Database {
   mcp_server: McpServerTable;
   oauth_token: OAuthTokenTable;
   oauth_pending_authorization: OAuthPendingAuthorizationTable;
+  resolvex_incident: ResolvexIncidentTable;
+  resolvex_graph_node: ResolvexGraphNodeTable;
+  resolvex_graph_edge: ResolvexGraphEdgeTable;
 }

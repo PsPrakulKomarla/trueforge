@@ -23,7 +23,7 @@ const TimestampSchema = z.string().openapi('Timestamp');
 // ---------------------------------------------------------------------------
 
 export const EvidenceKindSchema = z
-  .enum(['log', 'metric', 'deployment', 'config', 'health', 'event'])
+  .enum(['log', 'metric', 'deployment', 'config', 'health', 'event', 'graph'])
   .openapi('EvidenceKind');
 export type EvidenceKind = z.infer<typeof EvidenceKindSchema>;
 
@@ -177,6 +177,22 @@ export const VerificationReportSchema = z
 
 export type VerificationReport = z.infer<typeof VerificationReportSchema>;
 
+export const GraphEvidenceDirectionSchema = z
+  .enum(['dependency', 'dependent', 'related'])
+  .openapi('GraphEvidenceDirection');
+
+export const GraphEvidenceSchema = z
+  .object({
+    node_id: z.string().min(1),
+    node_type: z.string().min(1),
+    relationship: z.string().min(1),
+    direction: GraphEvidenceDirectionSchema,
+    data: z.record(z.string(), z.unknown()),
+  })
+  .openapi('ResolvexGraphEvidence');
+
+export type GraphEvidence = z.infer<typeof GraphEvidenceSchema>;
+
 // ---------------------------------------------------------------------------
 // Aggregate
 // ---------------------------------------------------------------------------
@@ -205,6 +221,14 @@ export const IncidentSchema = z
     /** Append-only audit trail. */
     actions: z.array(AuditEventSchema),
     error: z.string().optional(),
+    /** Priority for triage (higher = more urgent). Default 0. */
+    priority: z.number().int().min(0).default(0),
+    /**
+     * Graph context collected during investigation — dependency relationships
+     * that guided (but did NOT confirm) the diagnosis. Each entry references
+     * node ids in the service dependency graph.
+     */
+    graph_evidence: z.array(GraphEvidenceSchema).default([]),
   })
   .openapi('ResolvexIncident');
 
