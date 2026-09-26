@@ -124,3 +124,4 @@ export { createDevOpsProviderRegistry, type DevOpsProviderRegistry } from './pro
 export { createUnavailableProvider } from './providers/unavailableProvider';
 export { PROVIDER_CAPABILITIES, unavailableResult, unsupportedResult, type DevOpsProvider, type EnvironmentContext, type ProviderCapability, type ProviderResult, type ProviderStatus } from './providers/provider';
 export { createPersistentExecutionStore, ToolExecutionRecordSchema, ResolveXExecutionRecordSchema, type ExecutionStore, type ResolveXExecutionRecord, type ToolExecutionRecord } from './store/executionStore';
+export { correlateEvidence, diagnosisHasProvenance, normalizeToolEvidence, type EvidenceCorrelation, type NormalizedEvidence, type EvidenceRelation } from './services/evidenceCorrelation';
