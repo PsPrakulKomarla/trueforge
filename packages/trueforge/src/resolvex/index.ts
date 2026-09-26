@@ -90,3 +90,6 @@ export type { AIGenerateRequest, AIProvider, AIStreamEvent, AIStructuredRequest,
 export { createIncidentService } from './services/incidentService';
 export { createInMemoryIncidentStore, type IncidentStore } from './store/incidentStore';
 export { createDemoEnvironment, createDemoTools, type DemoEnvironment } from './tools/demoTools';
+
+export { createPersistentIncidentStore } from './store/incidentStore';
+export { createServiceGraph, createDemoServiceGraph, GraphNodeKindSchema, GraphRelationSchema, GraphNodeSchema, GraphEdgeSchema, type ServiceGraph, type GraphNode, type GraphEdge, type RelevantGraphNode } from './graph/serviceGraph';

@@ -71,6 +71,9 @@ export const DiagnosisSchema = z
     /** Model that produced this diagnosis (provider-agnostic identity). */
     model: z.string(),
     generated_at: TimestampSchema,
+    affected_service: z.string().optional(),
+    related_dependency: z.string().optional(),
+    related_deployment: z.string().optional(),
   })
   .openapi('ResolvexDiagnosis');
 

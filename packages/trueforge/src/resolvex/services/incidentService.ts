@@ -4,11 +4,12 @@ import type { EvidenceRecord, Incident } from '../domain/incident';
 import { assertTransition } from '../domain/incidentState';
 import { approvalRequirement } from '../policies/approvalPolicy';
 import type { IncidentStore } from '../store/incidentStore';
+import { createDemoServiceGraph, type ServiceGraph } from '../graph/serviceGraph';
 import { createDemoEnvironment, createDemoTools } from '../tools/demoTools';
 import { createDevOpsToolRegistry, type ToolContext } from '../tools/devopsTool';
 
 const now = () => new Date().toISOString();
-export function createIncidentService(store: IncidentStore, settings: ResolvexSettings) {
+export function createIncidentService(store: IncidentStore, settings: ResolvexSettings, graph: ServiceGraph = createDemoServiceGraph()) {
   const registry = createDevOpsToolRegistry();
   const environment = createDemoEnvironment();
   for (const tool of createDemoTools(environment)) registry.register(tool);
@@ -105,6 +106,14 @@ export function createIncidentService(store: IncidentStore, settings: ResolvexSe
         ['get_recent_logs', 'Recent application logs', 'log', {}],
         ['get_recent_deployment', 'Recent deployment', 'deployment', {}],
       ];
+      const related = graph.relevantTo(current.service, 2);
+      if (related.length) {
+        change(id, i => {
+          i.evidence.push({ id: `ev-${randomUUID()}`, kind: 'event', source: 'service-graph', collector: 'dependency_graph', observed_at: now(), summary: `Related graph resources: ${related.map(node => node.name).join(', ')}`, data: { nodes: related } });
+          event(i, 'evidence_collected', 'Dependency graph scope established', { nodes: related });
+        });
+        current = store.get(id)!;
+      }
       for (const [tool, summary, kind, args] of specs) {
         const result = await invoke(current, tool, { service: current.service, ...args });
         change(id, i => {
@@ -140,10 +149,18 @@ export function createIncidentService(store: IncidentStore, settings: ResolvexSe
           confidence: 0.96,
           model: 'deterministic-demo',
           generated_at: now(),
+          affected_service: i.service,
+          related_dependency: graph.getDependencies(i.service)[0]?.name,
+          related_deployment: graph.getNeighbors(i.service, 'deployed_by')[0]?.name,
         };
         event(i, 'diagnosis_generated', i.diagnosis.summary);
       });
       return this.createPlan(id);
+    },
+    graph(id: string) {
+      const incident = store.get(id);
+      if (!incident) throw new Error('Incident not found');
+      return { affected: graph.getNode(incident.service), related: graph.relevantTo(incident.service, 2), nodes: graph.nodes(), edges: graph.edges() };
     },
     createPlan(id: string) {
       return change(id, i => {

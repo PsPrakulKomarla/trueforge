@@ -7,6 +7,7 @@
  */
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { IncidentsPage } from './pages/IncidentsPage';
 
 interface ResolveXRoute {
   path: string;
@@ -58,7 +59,7 @@ export function ResolvexApp({ basename }: { basename: string }) {
                 <Route
                   key={route.path}
                   path={route.path}
-                  element={<PlaceholderPage title={route.title} detail={route.detail} />}
+                  element={route.path === '/incidents' ? <IncidentsPage /> : <PlaceholderPage title={route.title} detail={route.detail} />}
                 />
               ))}
             </Routes>
