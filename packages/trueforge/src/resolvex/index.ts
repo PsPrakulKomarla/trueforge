@@ -127,3 +127,4 @@ export { createPersistentExecutionStore, ToolExecutionRecordSchema, ResolveXExec
 export { correlateEvidence, diagnosisHasProvenance, normalizeToolEvidence, type EvidenceCorrelation, type NormalizedEvidence, type EvidenceRelation } from './services/evidenceCorrelation';
 export { createResolveXConnector, type ConnectorOperation, type ConnectorResult, type ResolveXConnector } from './providers/connector';
 export { EnvironmentSchema, ExecutionModeSchema, RemediationRequestSchema, evaluateRemediation, executeModeResult, remediationPlanHash, type ApprovalBinding, type ExecutionMode, type RemediationRequest, type ResolveXEnvironment, type PolicyDecision } from './providers/executionPolicy';
+export { correlateIncidents, findRootCauseCandidates, groupCorrelatedIncidents, type CorrelationSignal, type CorrelationSignalType, type CorrelationStatus, type IncidentCorrelation, type IncidentGroup, type RootCauseCandidate } from './services/incidentCorrelation';
