@@ -1,15 +1,152 @@
 import { z } from 'zod';
 import { assertExecutionTransition, type ResolveXExecutionState } from '../domain/execution';
-import { evaluateRemediation, remediationPlanHash, type ApprovalBinding, type ExecutionMode, type RemediationRequest, type ResolveXEnvironment } from '../providers/executionPolicy';
-export const RemediationActionSchema = z.object({ id: z.string().min(1), tool: z.string().min(1), target: z.string().min(1), parameters: z.record(z.string(), z.unknown()).default({}), risk: z.enum(['low', 'medium', 'high']), order: z.number().int().positive(), reason: z.string().min(1), expected_effect: z.string().min(1), rollback_strategy: z.string().min(1), verification_strategy: z.string().min(1) });
+import {
+  evaluateRemediation,
+  remediationPlanHash,
+  type ApprovalBinding,
+  type ExecutionMode,
+  type RemediationRequest,
+  type ResolveXEnvironment,
+} from '../providers/executionPolicy';
+export const RemediationActionSchema = z.object({
+  id: z.string().min(1),
+  tool: z.string().min(1),
+  target: z.string().min(1),
+  parameters: z.record(z.string(), z.unknown()).default({}),
+  risk: z.enum(['low', 'medium', 'high']),
+  order: z.number().int().positive(),
+  reason: z.string().min(1),
+  expected_effect: z.string().min(1),
+  rollback_strategy: z.string().min(1),
+  verification_strategy: z.string().min(1),
+});
 export type RemediationAction = z.infer<typeof RemediationActionSchema>;
-export type RemediationPlan = { incident_id: string; plan_id: string; diagnosis_id?: string; actions: RemediationAction[]; expected_outcome: string; verification_strategy: string; rollback_strategy: string; max_actions: number; };
-export type ActionState = 'planned' | 'blocked' | 'awaiting_approval' | 'approved' | 'executing' | 'succeeded' | 'failed' | 'rolled_back' | 'cancelled' | 'escalated';
-const transitions: Record<ActionState, readonly ActionState[]> = { planned: ['blocked', 'awaiting_approval', 'approved', 'cancelled'], blocked: ['cancelled', 'escalated'], awaiting_approval: ['approved', 'cancelled', 'escalated'], approved: ['executing', 'cancelled'], executing: ['succeeded', 'failed'], succeeded: [], failed: ['rolled_back', 'awaiting_approval', 'escalated'], rolled_back: ['escalated'], cancelled: [], escalated: [] };
-export function canTransitionAction(from: ActionState, to: ActionState): boolean { return transitions[from].includes(to); }
-export function assertActionTransition(from: ActionState, to: ActionState): void { if (!canTransitionAction(from, to)) throw new Error(`Illegal remediation action transition ${from} -> ${to}`); }
-export function validatePlan(plan: RemediationPlan, availableTools: ReadonlySet<string>, maxActions = 5): { valid: true } | { valid: false; reason: string } { if (plan.actions.length === 0 || plan.actions.length > Math.min(maxActions, plan.max_actions)) return { valid: false, reason: 'Remediation action budget exceeded' }; const orders = new Set<number>(); for (const action of plan.actions) { if (!availableTools.has(action.tool)) return { valid: false, reason: `Unknown remediation tool: ${action.tool}` }; if (orders.has(action.order)) return { valid: false, reason: `Duplicate action order: ${String(action.order)}` }; orders.add(action.order); if (!RemediationActionSchema.safeParse(action).success) return { valid: false, reason: `Invalid remediation action: ${action.id}` }; } return { valid: true }; }
-export function evaluateAction(input: { action: RemediationAction; incidentId: string; planId: string; mode: ExecutionMode; environment: ResolveXEnvironment; approval?: ApprovalBinding }): ReturnType<typeof evaluateRemediation> { const request: RemediationRequest = { operation: input.action.tool, target: input.action.target, risk: input.action.risk, reason: input.action.reason, expected_effect: input.action.expected_effect, rollback_strategy: input.action.rollback_strategy, verification_strategy: input.action.verification_strategy }; return evaluateRemediation({ plan: request, mode: input.mode, environment: input.environment, approval: input.approval, incidentId: input.incidentId, planId: input.planId }); }
-export function planIdentity(plan: RemediationPlan): string { return remediationPlanHash({ operation: plan.actions.map(action => action.tool).join('>'), target: plan.actions.map(action => action.target).join(','), risk: plan.actions.some(action => action.risk === 'high') ? 'high' : plan.actions.some(action => action.risk === 'medium') ? 'medium' : 'low', reason: plan.expected_outcome, expected_effect: plan.verification_strategy, rollback_strategy: plan.rollback_strategy, verification_strategy: plan.verification_strategy }); }
-export function decideAfterVerification(passed: boolean, attempt: number, maxAttempts: number, hasRollback: boolean): 'resolved' | 'retry' | 'rollback' | 'escalated' { if (passed) return 'resolved'; if (attempt >= maxAttempts) return 'escalated'; if (hasRollback) return 'rollback'; return 'retry'; }
-export function transitionExecution(state: ResolveXExecutionState, next: ResolveXExecutionState): ResolveXExecutionState { assertExecutionTransition(state, next); return next; }
+export interface RemediationPlan {
+  incident_id: string;
+  plan_id: string;
+  diagnosis_id?: string;
+  actions: RemediationAction[];
+  expected_outcome: string;
+  verification_strategy: string;
+  rollback_strategy: string;
+  max_actions: number;
+}
+export type ActionState =
+  | 'planned'
+  | 'blocked'
+  | 'awaiting_approval'
+  | 'approved'
+  | 'executing'
+  | 'succeeded'
+  | 'failed'
+  | 'rolled_back'
+  | 'cancelled'
+  | 'escalated';
+const transitions: Record<ActionState, readonly ActionState[]> = {
+  planned: ['blocked', 'awaiting_approval', 'approved', 'cancelled'],
+  blocked: ['cancelled', 'escalated'],
+  awaiting_approval: ['approved', 'cancelled', 'escalated'],
+  approved: ['executing', 'cancelled'],
+  executing: ['succeeded', 'failed'],
+  succeeded: [],
+  failed: ['rolled_back', 'awaiting_approval', 'escalated'],
+  rolled_back: ['escalated'],
+  cancelled: [],
+  escalated: [],
+};
+export function canTransitionAction(from: ActionState, to: ActionState): boolean {
+  return transitions[from].includes(to);
+}
+export function assertActionTransition(from: ActionState, to: ActionState): void {
+  if (!canTransitionAction(from, to)) {
+    throw new Error(`Illegal remediation action transition ${from} -> ${to}`);
+  }
+}
+export function validatePlan(
+  plan: RemediationPlan,
+  availableTools: ReadonlySet<string>,
+  maxActions = 5,
+): { valid: true } | { valid: false; reason: string } {
+  if (plan.actions.length === 0 || plan.actions.length > Math.min(maxActions, plan.max_actions)) {
+    return { valid: false, reason: 'Remediation action budget exceeded' };
+  }
+  const orders = new Set<number>();
+  for (const action of plan.actions) {
+    if (!availableTools.has(action.tool)) {
+      return { valid: false, reason: `Unknown remediation tool: ${action.tool}` };
+    }
+    if (orders.has(action.order)) {
+      return { valid: false, reason: `Duplicate action order: ${String(action.order)}` };
+    }
+    orders.add(action.order);
+    if (!RemediationActionSchema.safeParse(action).success) {
+      return { valid: false, reason: `Invalid remediation action: ${action.id}` };
+    }
+  }
+  return { valid: true };
+}
+export function evaluateAction(input: {
+  action: RemediationAction;
+  incidentId: string;
+  planId: string;
+  mode: ExecutionMode;
+  environment: ResolveXEnvironment;
+  approval?: ApprovalBinding;
+}): ReturnType<typeof evaluateRemediation> {
+  const request: RemediationRequest = {
+    operation: input.action.tool,
+    target: input.action.target,
+    risk: input.action.risk,
+    reason: input.action.reason,
+    expected_effect: input.action.expected_effect,
+    rollback_strategy: input.action.rollback_strategy,
+    verification_strategy: input.action.verification_strategy,
+  };
+  return evaluateRemediation({
+    plan: request,
+    mode: input.mode,
+    environment: input.environment,
+    incidentId: input.incidentId,
+    planId: input.planId,
+    ...(input.approval === undefined ? {} : { approval: input.approval }),
+  });
+}
+export function planIdentity(plan: RemediationPlan): string {
+  return remediationPlanHash({
+    operation: plan.actions.map(action => action.tool).join('>'),
+    target: plan.actions.map(action => action.target).join(','),
+    risk: plan.actions.some(action => action.risk === 'high')
+      ? 'high'
+      : plan.actions.some(action => action.risk === 'medium')
+        ? 'medium'
+        : 'low',
+    reason: plan.expected_outcome,
+    expected_effect: plan.verification_strategy,
+    rollback_strategy: plan.rollback_strategy,
+    verification_strategy: plan.verification_strategy,
+  });
+}
+export function decideAfterVerification(
+  passed: boolean,
+  attempt: number,
+  maxAttempts: number,
+  hasRollback: boolean,
+): 'resolved' | 'retry' | 'rollback' | 'escalated' {
+  if (passed) {
+    return 'resolved';
+  }
+  if (attempt >= maxAttempts) {
+    return 'escalated';
+  }
+  if (hasRollback) {
+    return 'rollback';
+  }
+  return 'retry';
+}
+export function transitionExecution(
+  state: ResolveXExecutionState,
+  next: ResolveXExecutionState,
+): ResolveXExecutionState {
+  assertExecutionTransition(state, next);
+  return next;
+}

@@ -1,9 +1,137 @@
-import type { Incident } from '../domain/incident'; import type { ServiceGraph } from '../graph/serviceGraph';
+import type { Incident } from '../domain/incident';
+import type { ServiceGraph } from '../graph/serviceGraph';
+
 export type MemoryConfirmation = 'confirmed' | 'supported' | 'hypothesis' | 'rejected' | 'unknown';
-export type IncidentMemory = { incident_id: string; service: string; symptoms: string[]; dependencies: string[]; diagnosis_status: MemoryConfirmation; diagnosis_summary: string | null; remediation_tools: string[]; remediation_outcome: 'success' | 'failed' | 'unknown'; verification_status: string | null; outcome: Incident['state']; source: string; captured_at: string; evidence_count: number; quality: 'high' | 'medium' | 'low' };
-export type MemoryMatch = { memory: IncidentMemory; relevance: number; confidence: 'high' | 'medium' | 'low'; signals: string[]; explanation: string; stale: boolean };
+
+export interface IncidentMemory {
+  incident_id: string;
+  service: string;
+  symptoms: string[];
+  dependencies: string[];
+  diagnosis_status: MemoryConfirmation;
+  diagnosis_summary: string | null;
+  remediation_tools: string[];
+  remediation_outcome: 'success' | 'failed' | 'unknown';
+  verification_status: string | null;
+  outcome: Incident['state'];
+  source: string;
+  captured_at: string;
+  evidence_count: number;
+  quality: 'high' | 'medium' | 'low';
+}
+
+export interface MemoryMatch {
+  memory: IncidentMemory;
+  relevance: number;
+  confidence: 'high' | 'medium' | 'low';
+  signals: string[];
+  explanation: string;
+  stale: boolean;
+}
+
 const terminal = new Set(['resolved', 'failed', 'cancelled', 'escalated']);
-function diagnosisStatus(incident: Incident): MemoryConfirmation { if (!incident.diagnosis) return 'unknown'; return incident.diagnosis.root_cause === null ? 'hypothesis' : incident.diagnosis.confidence >= 0.9 ? 'confirmed' : 'supported'; }
-function deployment(incident: Incident): string | undefined { return incident.evidence.find(item => item.kind === 'deployment')?.summary; }
-export function extractIncidentMemory(incident: Incident, graph: ServiceGraph, source = 'incident_store'): IncidentMemory | undefined { if (!terminal.has(incident.state)) return undefined; const successful = incident.actions.filter(action => action.status === 'ok' && action.tool).map(action => action.tool!); const failed = incident.actions.filter(action => action.status === 'error' && action.tool).map(action => action.tool!); return { incident_id: incident.id, service: incident.service, symptoms: incident.evidence.map(item => item.summary), dependencies: graph.getDependencies(incident.service).map(node => node.id), diagnosis_status: diagnosisStatus(incident), diagnosis_summary: incident.diagnosis?.summary ?? null, remediation_tools: [...new Set([...successful, ...failed])], remediation_outcome: incident.verification?.status === 'passed' ? 'success' : failed.length ? 'failed' : 'unknown', verification_status: incident.verification?.status ?? null, outcome: incident.state, source, captured_at: incident.updated_at, evidence_count: incident.evidence.length, quality: incident.verification?.status === 'passed' && incident.evidence.length >= 2 ? 'high' : incident.evidence.length ? 'medium' : 'low' }; }
-export function retrieveMemory(current: { service: string; symptoms: string[]; dependencies?: string[]; deployment?: string }, memories: IncidentMemory[], options: { limit?: number; now?: string; maxAgeMs?: number } = {}): MemoryMatch[] { const now = Date.parse(options.now ?? new Date().toISOString()); return memories.map(memory => { const signals: string[] = []; let score = 0; if (memory.service === current.service) { score += 0.3; signals.push('same_service'); } const symptomMatches = current.symptoms.filter(symptom => memory.symptoms.includes(symptom)).length; if (symptomMatches) { score += Math.min(0.3, symptomMatches * 0.15); signals.push('similar_symptoms'); } const shared = (current.dependencies ?? []).filter(dep => memory.dependencies.includes(dep)); if (shared.length) { score += 0.15; signals.push('shared_dependency'); } if (current.deployment && memory.symptoms.some(symptom => symptom.includes(current.deployment!))) { score += 0.1; signals.push('similar_deployment_context'); } const age = Math.max(0, now - Date.parse(memory.captured_at)); const stale = age > (options.maxAgeMs ?? 365 * 24 * 60 * 60 * 1000); if (stale) score *= 0.7; const confidence = memory.quality === 'high' && memory.diagnosis_status === 'confirmed' ? 'high' : memory.quality === 'low' || memory.diagnosis_status === 'hypothesis' ? 'low' : 'medium'; return { memory, relevance: Math.min(1, score), confidence, signals, stale, explanation: signals.length ? `${memory.incident_id} retrieved because ${signals.join(', ')}. Historical evidence is not proof of the current root cause.` : 'No strong matching signal.' }; }).filter(match => match.signals.length > 0).sort((a, b) => b.relevance - a.relevance).slice(0, options.limit ?? 10); }
+
+function diagnosisStatus(incident: Incident): MemoryConfirmation {
+  if (!incident.diagnosis) {
+    return 'unknown';
+  }
+  if (incident.diagnosis.root_cause === null) {
+    return 'hypothesis';
+  }
+  return incident.diagnosis.confidence >= 0.9 ? 'confirmed' : 'supported';
+}
+
+export function extractIncidentMemory(
+  incident: Incident,
+  graph: ServiceGraph,
+  source = 'incident_store',
+): IncidentMemory | undefined {
+  if (!terminal.has(incident.state)) {
+    return undefined;
+  }
+  const successful = incident.actions.flatMap(action =>
+    action.status === 'ok' && action.tool !== undefined ? [action.tool] : [],
+  );
+  const failed = incident.actions.flatMap(action =>
+    action.status === 'error' && action.tool !== undefined ? [action.tool] : [],
+  );
+  return {
+    incident_id: incident.id,
+    service: incident.service,
+    symptoms: incident.evidence.map(item => item.summary),
+    dependencies: graph.getDependencies(incident.service).map(node => node.id),
+    diagnosis_status: diagnosisStatus(incident),
+    diagnosis_summary: incident.diagnosis?.summary ?? null,
+    remediation_tools: [...new Set([...successful, ...failed])],
+    remediation_outcome:
+      incident.verification?.status === 'passed' ? 'success' : failed.length > 0 ? 'failed' : 'unknown',
+    verification_status: incident.verification?.status ?? null,
+    outcome: incident.state,
+    source,
+    captured_at: incident.updated_at,
+    evidence_count: incident.evidence.length,
+    quality:
+      incident.verification?.status === 'passed' && incident.evidence.length >= 2
+        ? 'high'
+        : incident.evidence.length > 0
+          ? 'medium'
+          : 'low',
+  };
+}
+
+export function retrieveMemory(
+  current: { service: string; symptoms: string[]; dependencies?: string[]; deployment?: string },
+  memories: IncidentMemory[],
+  options: { limit?: number; now?: string; maxAgeMs?: number } = {},
+): MemoryMatch[] {
+  const now = Date.parse(options.now ?? new Date().toISOString());
+  return memories
+    .map(memory => {
+      const signals: string[] = [];
+      let score = 0;
+      if (memory.service === current.service) {
+        score += 0.3;
+        signals.push('same_service');
+      }
+      const symptomMatches = current.symptoms.filter(symptom => memory.symptoms.includes(symptom)).length;
+      if (symptomMatches > 0) {
+        score += Math.min(0.3, symptomMatches * 0.15);
+        signals.push('similar_symptoms');
+      }
+      const shared = (current.dependencies ?? []).filter(dep => memory.dependencies.includes(dep));
+      if (shared.length > 0) {
+        score += 0.15;
+        signals.push('shared_dependency');
+      }
+      const deployment = current.deployment;
+      if (deployment !== undefined && memory.symptoms.some(symptom => symptom.includes(deployment))) {
+        score += 0.1;
+        signals.push('similar_deployment_context');
+      }
+      const age = Math.max(0, now - Date.parse(memory.captured_at));
+      const stale = age > (options.maxAgeMs ?? 365 * 24 * 60 * 60 * 1000);
+      if (stale) {
+        score *= 0.7;
+      }
+      const confidence: MemoryMatch['confidence'] =
+        memory.quality === 'high' && memory.diagnosis_status === 'confirmed'
+          ? 'high'
+          : memory.quality === 'low' || memory.diagnosis_status === 'hypothesis'
+            ? 'low'
+            : 'medium';
+      return {
+        memory,
+        relevance: Math.min(1, score),
+        confidence,
+        signals,
+        stale,
+        explanation:
+          signals.length > 0
+            ? `${memory.incident_id} retrieved because ${signals.join(', ')}. Historical evidence is not proof of the current root cause.`
+            : 'No strong matching signal.',
+      };
+    })
+    .filter(match => match.signals.length > 0)
+    .sort((a, b) => b.relevance - a.relevance)
+    .slice(0, options.limit ?? 10);
+}

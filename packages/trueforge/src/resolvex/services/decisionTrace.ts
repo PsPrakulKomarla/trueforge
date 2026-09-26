@@ -1,5 +1,116 @@
 import type { Incident } from '../domain/incident';
-export type DecisionTraceStage = 'situation' | 'evidence' | 'diagnosis' | 'remediation' | 'approval' | 'verification' | 'outcome';
-export type Explanation = { reason: string; evidence_ids: string[]; sources: string[]; confidence: 'high' | 'medium' | 'low'; limitations: string[] };
-export type DecisionTraceEntry = { stage: DecisionTraceStage; status: 'observed' | 'hypothesis' | 'supported' | 'confirmed' | 'pending' | 'failed'; input: string; output: string; explanation: Explanation };
-export function buildDecisionTrace(incident: Incident): DecisionTraceEntry[] { const evidenceIds = incident.evidence.map(item => item.id); const entries: DecisionTraceEntry[] = [{ stage: 'situation', status: 'observed', input: incident.title, output: `${incident.service} is ${incident.state}`, explanation: { reason: 'Incident state and service are persisted observations.', evidence_ids: [], sources: [incident.source], confidence: 'high', limitations: [] } }, { stage: 'evidence', status: incident.evidence.length ? 'observed' : 'pending', input: `${String(incident.evidence.length)} evidence item(s)`, output: incident.evidence.map(item => item.summary).join('; ') || 'Evidence has not been collected', explanation: { reason: 'Evidence is collected by registered tools.', evidence_ids: evidenceIds, sources: [...new Set(incident.evidence.map(item => item.collector))], confidence: incident.evidence.length >= 2 ? 'medium' : 'low', limitations: incident.evidence.length ? [] : ['No evidence is available yet'] } }]; if (incident.diagnosis) entries.push({ stage: 'diagnosis', status: incident.diagnosis.root_cause ? 'supported' : 'hypothesis', input: `${String(incident.diagnosis.hypotheses.length)} hypothesis/hypotheses`, output: incident.diagnosis.summary, explanation: { reason: 'Diagnosis references collected evidence; it remains unconfirmed until verified.', evidence_ids: incident.diagnosis.root_cause_evidence_ids, sources: ['diagnosis'], confidence: incident.diagnosis.confidence >= 0.8 ? 'high' : incident.diagnosis.confidence >= 0.5 ? 'medium' : 'low', limitations: incident.diagnosis.root_cause ? ['Root cause is supported, not automatically confirmed by graph connectivity.'] : ['No root cause is confirmed.'] } }); if (incident.plan) entries.push({ stage: 'remediation', status: incident.plan.status === 'done' ? 'confirmed' : 'pending', input: incident.plan.steps.map(step => step.tool).join(', '), output: incident.plan.status, explanation: { reason: 'Remediation is a structured plan; plan creation does not execute it.', evidence_ids: incident.diagnosis?.root_cause_evidence_ids ?? [], sources: ['remediation_plan'], confidence: 'medium', limitations: ['Approval and verification remain required.'] } }); const approval = incident.approvals.at(-1); if (approval) entries.push({ stage: 'approval', status: approval.decision === 'approved' ? 'confirmed' : approval.decision === 'rejected' ? 'failed' : 'pending', input: approval.reason, output: approval.decision ?? 'pending', explanation: { reason: 'Approval is an authenticated policy boundary.', evidence_ids: [], sources: [approval.decided_by ?? 'pending'], confidence: 'high', limitations: approval.decision ? [] : ['No protected mutation may execute before approval.'] } }); entries.push({ stage: 'verification', status: incident.verification?.status === 'passed' ? 'confirmed' : incident.verification?.status === 'failed' ? 'failed' : 'pending', input: incident.verification ? `${String(incident.verification.attempts)} attempt(s)` : 'No verification attempt', output: incident.verification?.status ?? 'pending', explanation: { reason: 'Tool success is not resolution; verification is required.', evidence_ids: [], sources: ['verification'], confidence: incident.verification?.status === 'passed' ? 'high' : 'low', limitations: incident.verification?.status === 'passed' ? [] : ['Recovery is not verified.'] } }); return entries; }
+export type DecisionTraceStage =
+  'situation' | 'evidence' | 'diagnosis' | 'remediation' | 'approval' | 'verification' | 'outcome';
+export interface Explanation {
+  reason: string;
+  evidence_ids: string[];
+  sources: string[];
+  confidence: 'high' | 'medium' | 'low';
+  limitations: string[];
+}
+export interface DecisionTraceEntry {
+  stage: DecisionTraceStage;
+  status: 'observed' | 'hypothesis' | 'supported' | 'confirmed' | 'pending' | 'failed';
+  input: string;
+  output: string;
+  explanation: Explanation;
+}
+export function buildDecisionTrace(incident: Incident): DecisionTraceEntry[] {
+  const evidenceIds = incident.evidence.map(item => item.id);
+  const entries: DecisionTraceEntry[] = [
+    {
+      stage: 'situation',
+      status: 'observed',
+      input: incident.title,
+      output: `${incident.service} is ${incident.state}`,
+      explanation: {
+        reason: 'Incident state and service are persisted observations.',
+        evidence_ids: [],
+        sources: [incident.source],
+        confidence: 'high',
+        limitations: [],
+      },
+    },
+    {
+      stage: 'evidence',
+      status: incident.evidence.length ? 'observed' : 'pending',
+      input: `${String(incident.evidence.length)} evidence item(s)`,
+      output: incident.evidence.map(item => item.summary).join('; ') || 'Evidence has not been collected',
+      explanation: {
+        reason: 'Evidence is collected by registered tools.',
+        evidence_ids: evidenceIds,
+        sources: [...new Set(incident.evidence.map(item => item.collector))],
+        confidence: incident.evidence.length >= 2 ? 'medium' : 'low',
+        limitations: incident.evidence.length ? [] : ['No evidence is available yet'],
+      },
+    },
+  ];
+  if (incident.diagnosis) {
+    entries.push({
+      stage: 'diagnosis',
+      status: incident.diagnosis.root_cause ? 'supported' : 'hypothesis',
+      input: `${String(incident.diagnosis.hypotheses.length)} hypothesis/hypotheses`,
+      output: incident.diagnosis.summary,
+      explanation: {
+        reason: 'Diagnosis references collected evidence; it remains unconfirmed until verified.',
+        evidence_ids: incident.diagnosis.root_cause_evidence_ids,
+        sources: ['diagnosis'],
+        confidence:
+          incident.diagnosis.confidence >= 0.8 ? 'high' : incident.diagnosis.confidence >= 0.5 ? 'medium' : 'low',
+        limitations: incident.diagnosis.root_cause
+          ? ['Root cause is supported, not automatically confirmed by graph connectivity.']
+          : ['No root cause is confirmed.'],
+      },
+    });
+  }
+  if (incident.plan) {
+    entries.push({
+      stage: 'remediation',
+      status: incident.plan.status === 'done' ? 'confirmed' : 'pending',
+      input: incident.plan.steps.map(step => step.tool).join(', '),
+      output: incident.plan.status,
+      explanation: {
+        reason: 'Remediation is a structured plan; plan creation does not execute it.',
+        evidence_ids: incident.diagnosis?.root_cause_evidence_ids ?? [],
+        sources: ['remediation_plan'],
+        confidence: 'medium',
+        limitations: ['Approval and verification remain required.'],
+      },
+    });
+  }
+  const approval = incident.approvals.at(-1);
+  if (approval) {
+    entries.push({
+      stage: 'approval',
+      status: approval.decision === 'approved' ? 'confirmed' : approval.decision === 'rejected' ? 'failed' : 'pending',
+      input: approval.reason,
+      output: approval.decision ?? 'pending',
+      explanation: {
+        reason: 'Approval is an authenticated policy boundary.',
+        evidence_ids: [],
+        sources: [approval.decided_by ?? 'pending'],
+        confidence: 'high',
+        limitations: approval.decision ? [] : ['No protected mutation may execute before approval.'],
+      },
+    });
+  }
+  entries.push({
+    stage: 'verification',
+    status:
+      incident.verification?.status === 'passed'
+        ? 'confirmed'
+        : incident.verification?.status === 'failed'
+          ? 'failed'
+          : 'pending',
+    input: incident.verification ? `${String(incident.verification.attempts)} attempt(s)` : 'No verification attempt',
+    output: incident.verification?.status ?? 'pending',
+    explanation: {
+      reason: 'Tool success is not resolution; verification is required.',
+      evidence_ids: [],
+      sources: ['verification'],
+      confidence: incident.verification?.status === 'passed' ? 'high' : 'low',
+      limitations: incident.verification?.status === 'passed' ? [] : ['Recovery is not verified.'],
+    },
+  });
+  return entries;
+}

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@hono/zod-openapi';
 
 export const NodeTypeSchema = z.enum(['service', 'deployment', 'database', 'queue', 'external', 'infrastructure']);
 export type NodeType = z.infer<typeof NodeTypeSchema>;

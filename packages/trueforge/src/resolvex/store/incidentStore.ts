@@ -73,13 +73,17 @@ export function createPersistentIncidentStore(filePath: string): IncidentStore {
   const path = require('node:path') as typeof import('node:path');
   const load = (): Map<string, Incident> => {
     try {
-      const raw = fs.readFileSync(filePath, 'utf8') as string;
+      const raw = fs.readFileSync(filePath, 'utf8');
       const values = JSON.parse(raw) as unknown;
-      if (!Array.isArray(values)) throw new Error('ResolveX incident store is malformed: expected an array');
+      if (!Array.isArray(values)) {
+        throw new Error('ResolveX incident store is malformed: expected an array');
+      }
       const incidents = values.map(value => IncidentSchema.parse(value));
       return new Map(incidents.map(incident => [incident.id, incident]));
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return new Map();
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return new Map();
+      }
       throw error;
     }
   };
@@ -92,26 +96,30 @@ export function createPersistentIncidentStore(filePath: string): IncidentStore {
   return {
     create(incident) {
       const incidents = load();
-      if (incidents.has(incident.id)) throw new Error(`Incident already exists: ${incident.id}`);
+      if (incidents.has(incident.id)) {
+        throw new Error(`Incident already exists: ${incident.id}`);
+      }
       incidents.set(incident.id, structuredClone(incident));
       save(incidents);
-      return structuredClone(incident);
+      return Promise.resolve(structuredClone(incident));
     },
     get(id) {
       const incident = load().get(id);
-      return incident ? structuredClone(incident) : undefined;
+      return Promise.resolve(incident ? structuredClone(incident) : undefined);
     },
     update(id, updater) {
       const incidents = load();
       const current = incidents.get(id);
-      if (!current) throw new Error(`Incident not found: ${id}`);
+      if (!current) {
+        throw new Error(`Incident not found: ${id}`);
+      }
       const next = updater(structuredClone(current));
       incidents.set(id, structuredClone(next));
       save(incidents);
-      return structuredClone(next);
+      return Promise.resolve(structuredClone(next));
     },
     list() {
-      return [...load().values()].map(structuredClone);
+      return Promise.resolve([...load().values()].map(incident => structuredClone(incident)));
     },
   };
 }

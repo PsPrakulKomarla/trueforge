@@ -91,6 +91,17 @@ export {
 export type { AIGenerateRequest, AIProvider, AIStreamEvent, AIStructuredRequest, AITextResult } from './ai/provider';
 
 export { createResolvexAgentDefinition, type ResolvexGraphContext } from './agent';
+export { executeResolveXInvestigation, type ResolveXExecutionResult } from './agentExecution';
+export {
+  ResolveXExecutionSchema,
+  ResolveXExecutionStateSchema,
+  assertExecutionTransition,
+  canTransitionExecution,
+  decideRecovery,
+  type RecoveryDecision,
+  type ResolveXExecution,
+  type ResolveXExecutionState,
+} from './domain/execution';
 export { DEMO_TENANT_ID, createDemoServiceGraph } from './graph/demoTopology';
 export { createInMemoryGraphStore, type GraphStore } from './graph/graphStore';
 export {
@@ -107,7 +118,131 @@ export {
   type NodeType,
   type ServiceGraph,
 } from './graph/serviceGraph';
+export {
+  createResolveXConnector,
+  type ConnectorOperation,
+  type ConnectorResult,
+  type ResolveXConnector,
+} from './providers/connector';
+export {
+  EnvironmentSchema,
+  ExecutionModeSchema,
+  RemediationRequestSchema,
+  evaluateRemediation,
+  executeModeResult,
+  remediationPlanHash,
+  type ApprovalBinding,
+  type ExecutionMode,
+  type PolicyDecision,
+  type RemediationRequest,
+  type ResolveXEnvironment,
+} from './providers/executionPolicy';
+export {
+  PROVIDER_CAPABILITIES,
+  unavailableResult,
+  unsupportedResult,
+  type DevOpsProvider,
+  type EnvironmentContext,
+  type ProviderCapability,
+  type ProviderResult,
+  type ProviderStatus,
+} from './providers/provider';
+export { createDevOpsProviderRegistry, type DevOpsProviderRegistry } from './providers/registry';
+export { createUnavailableProvider } from './providers/unavailableProvider';
+export {
+  buildDecisionTrace,
+  type DecisionTraceEntry,
+  type DecisionTraceStage,
+  type Explanation,
+} from './services/decisionTrace';
+export {
+  correlateEvidence,
+  diagnosisHasProvenance,
+  normalizeToolEvidence,
+  type EvidenceCorrelation,
+  type EvidenceRelation,
+  type NormalizedEvidence,
+} from './services/evidenceCorrelation';
+export {
+  extractIncidentMemory,
+  retrieveMemory,
+  type IncidentMemory,
+  type MemoryConfirmation,
+  type MemoryMatch,
+} from './services/historicalMemory';
+export {
+  correlateIncidents,
+  findRootCauseCandidates,
+  groupCorrelatedIncidents,
+  type CorrelationSignal,
+  type CorrelationSignalType,
+  type CorrelationStatus,
+  type IncidentCorrelation,
+  type IncidentGroup,
+  type RootCauseCandidate,
+} from './services/incidentCorrelation';
+export {
+  buildRecommendation,
+  extractResolutionRecord,
+  findSimilarIncidents,
+  similarity,
+  type RemediationRecommendation,
+  type ResolutionRecord,
+  type SimilarIncident,
+  type SimilaritySignal,
+} from './services/incidentMemory';
 export { createIncidentService } from './services/incidentService';
+export {
+  addHypothesis,
+  buildInvestigationContext,
+  hasRepeatedToolCall,
+  rankHypothesis,
+  type HypothesisStatus,
+  type InvestigationContext,
+  type InvestigationHypothesis,
+} from './services/investigationOrchestrator';
+export {
+  ResolveXOperationalError,
+  createCircuitBreaker,
+  degradedMode,
+  retrySafe,
+  type CircuitBreaker,
+  type CircuitState,
+  type ResolveXErrorCode,
+} from './services/operationalSafety';
+export {
+  assessRisk,
+  calculateBaseline,
+  calculateBlastRadius,
+  createPrediction,
+  detectAnomaly,
+  type Anomaly,
+  type Baseline,
+  type Prediction,
+  type PredictionStatus,
+  type RiskAssessment,
+  type Telemetry,
+} from './services/predictiveIntelligence';
+export {
+  RemediationActionSchema,
+  assertActionTransition,
+  canTransitionAction,
+  decideAfterVerification,
+  evaluateAction,
+  planIdentity,
+  transitionExecution,
+  validatePlan,
+  type ActionState,
+  type RemediationAction,
+} from './services/remediationOrchestrator';
+export {
+  ResolveXExecutionRecordSchema,
+  ToolExecutionRecordSchema,
+  createPersistentExecutionStore,
+  type ExecutionStore,
+  type ResolveXExecutionRecord,
+  type ToolExecutionRecord,
+} from './store/executionStore';
 export {
   IncidentNotFoundError,
   IncidentStoreConflictError,
@@ -116,20 +251,3 @@ export {
 } from './store/incidentStore';
 export { createDemoEnvironment, createDemoTools, type DemoEnvironment } from './tools/demoTools';
 export { ResolvexToolMCP, createResolvexToolMCP } from './tools/registryAdapter';
-export { executeResolveXInvestigation, type ResolveXExecutionResult, type ResolveXExecutionState } from './agentExecution';
-export { ResolveXExecutionSchema, ResolveXExecutionStateSchema, assertExecutionTransition, canTransitionExecution, decideRecovery, type ResolveXExecution, type ResolveXExecutionState, type RecoveryDecision } from './domain/execution';
-export { buildRecommendation, extractResolutionRecord, findSimilarIncidents, similarity, type SimilarIncident, type SimilaritySignal, type ResolutionRecord, type RemediationRecommendation } from './services/incidentMemory';
-export { addHypothesis, buildInvestigationContext, hasRepeatedToolCall, rankHypothesis, type HypothesisStatus, type InvestigationContext, type InvestigationHypothesis } from './services/investigationOrchestrator';
-export { createDevOpsProviderRegistry, type DevOpsProviderRegistry } from './providers/registry';
-export { createUnavailableProvider } from './providers/unavailableProvider';
-export { PROVIDER_CAPABILITIES, unavailableResult, unsupportedResult, type DevOpsProvider, type EnvironmentContext, type ProviderCapability, type ProviderResult, type ProviderStatus } from './providers/provider';
-export { createPersistentExecutionStore, ToolExecutionRecordSchema, ResolveXExecutionRecordSchema, type ExecutionStore, type ResolveXExecutionRecord, type ToolExecutionRecord } from './store/executionStore';
-export { correlateEvidence, diagnosisHasProvenance, normalizeToolEvidence, type EvidenceCorrelation, type NormalizedEvidence, type EvidenceRelation } from './services/evidenceCorrelation';
-export { createResolveXConnector, type ConnectorOperation, type ConnectorResult, type ResolveXConnector } from './providers/connector';
-export { EnvironmentSchema, ExecutionModeSchema, RemediationRequestSchema, evaluateRemediation, executeModeResult, remediationPlanHash, type ApprovalBinding, type ExecutionMode, type RemediationRequest, type ResolveXEnvironment, type PolicyDecision } from './providers/executionPolicy';
-export { correlateIncidents, findRootCauseCandidates, groupCorrelatedIncidents, type CorrelationSignal, type CorrelationSignalType, type CorrelationStatus, type IncidentCorrelation, type IncidentGroup, type RootCauseCandidate } from './services/incidentCorrelation';
-export { assessRisk, calculateBaseline, calculateBlastRadius, createPrediction, detectAnomaly, type Anomaly, type Baseline, type Prediction, type PredictionStatus, type RiskAssessment, type Telemetry } from './services/predictiveIntelligence';
-export { assertActionTransition, canTransitionAction, decideAfterVerification, evaluateAction, planIdentity, transitionExecution, validatePlan, RemediationActionSchema, type ActionState, type RemediationAction, type RemediationPlan } from './services/remediationOrchestrator';
-export { extractIncidentMemory, retrieveMemory, type IncidentMemory, type MemoryConfirmation, type MemoryMatch } from './services/historicalMemory';
-export { createCircuitBreaker, degradedMode, retrySafe, ResolveXOperationalError, type CircuitBreaker, type CircuitState, type ResolveXErrorCode } from './services/operationalSafety';
-export { buildDecisionTrace, type DecisionTraceEntry, type DecisionTraceStage, type Explanation } from './services/decisionTrace';

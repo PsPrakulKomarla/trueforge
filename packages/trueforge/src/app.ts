@@ -55,7 +55,6 @@ import { PACKAGE_VERSION } from './packageVersion';
 import { resolvexSettings } from './resolvex/config';
 import type { GraphStore } from './resolvex/graph/graphStore';
 import type { IncidentStore } from './resolvex/store/incidentStore';
-import { createPersistentIncidentStore } from './resolvex/store/incidentStore';
 import { OPENAPI_DOCUMENT_TAGS } from './routes/openapiTags';
 import type { ActiveTurnRegistry } from './runtime/activeTurns';
 import type { EventSubscriptionRegistry } from './runtime/event-subscription';
@@ -260,19 +259,6 @@ export function createServerApp<TTransaction>(deps: ServerDeps<TTransaction>) {
   app.use('*', createRequestBodyLimitMiddleware(configuration.MAX_REQUEST_BODY_BYTES));
 
   app.get('/healthz', c => c.json({ status: 'ok', version: PACKAGE_VERSION }));
-
-  // ResolveX remains behind the same TrueForge authentication boundary as the other APIs.
-  // The store is injectable in future server wiring; this fallback preserves the demo-safe API.
-  app.route(
-    '/api/resolvex',
-    withAuth(
-      createResolvexRouter({
-        store: createPersistentIncidentStore(`${configuration.SQLITE_PATH}.resolvex.json`),
-        settings: resolvexSettings(configuration),
-      }),
-      authMiddleware,
-    ),
-  );
 
   app.route(
     '/api/v1/auth',

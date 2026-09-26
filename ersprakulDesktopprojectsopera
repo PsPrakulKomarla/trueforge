@@ -1,0 +1,10 @@
+warning: in the working copy of 'packages/trueforge/src/app.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'packages/trueforge/src/resolvex/graph/serviceGraph.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'packages/trueforge/src/resolvex/store/incidentStore.ts', LF will be replaced by CRLF the next time Git touches it
+ packages/trueforge/src/app.ts                               | 13 [31m-------------[m
+ packages/trueforge/src/resolvex/graph/serviceGraph.ts       |  2 [32m+[m[31m-[m
+ .../trueforge/src/resolvex/providers/executionPolicy.ts     |  1 [31m-[m
+ .../trueforge/src/resolvex/services/evidenceCorrelation.ts  |  2 [32m+[m[31m-[m
+ packages/trueforge/src/resolvex/store/executionStore.ts     |  2 [32m+[m[31m-[m
+ packages/trueforge/src/resolvex/store/incidentStore.ts      |  8 [32m++++[m[31m----[m
+ 6 files changed, 7 insertions(+), 21 deletions(-)

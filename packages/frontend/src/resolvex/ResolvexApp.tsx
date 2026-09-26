@@ -1,6 +1,6 @@
 /** ResolveX owns a sibling router so incident routes do not conflict with the chat shell. */
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
-import { IncidentDetailPage, IncidentsPage } from './pages/IncidentsPage';
+import { IncidentDetail, IncidentsPage } from './pages/IncidentsPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 
 interface ResolveXRoute {
@@ -62,7 +62,7 @@ export function ResolvexApp({ basename }: { basename: string }) {
                   }
                 />
               ))}
-              <Route path="/incidents/:incidentId" element={<IncidentDetailPage />} />
+              <Route path="/incidents/:incidentId" element={<IncidentDetail />} />
             </Routes>
           </main>
         </div>

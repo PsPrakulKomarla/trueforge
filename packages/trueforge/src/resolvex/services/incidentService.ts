@@ -74,10 +74,9 @@ export function createIncidentService(
       const result = await Promise.race([
         tool.execute(args, context(incident)),
         new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error(`Tool ${tool.id} timed out after ${String(tool.timeoutMs)}ms`)),
-            tool.timeoutMs,
-          ),
+          setTimeout(() => {
+            reject(new Error(`Tool ${tool.id} timed out after ${String(tool.timeoutMs)}ms`));
+          }, tool.timeoutMs),
         ),
       ]);
       await change(incident.id, current => {
@@ -391,7 +390,7 @@ export function createIncidentService(
         assertTransition(incident.state, 'resolved');
       }
       const result = await invoke(incident, 'verify_recovery', { service: incident.service }, actor);
-      const passed = result.output['status'] === 'healthy';
+      const passed = result.output.status === 'healthy';
       return change(id, current => {
         current.verification = {
           status: passed ? 'passed' : 'failed',

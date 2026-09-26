@@ -1,7 +1,96 @@
-export type ResolveXErrorCode = 'VALIDATION_ERROR' | 'AUTHORIZATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'APPROVAL_REQUIRED' | 'TOOL_FAILURE' | 'TOOL_TIMEOUT' | 'DEPENDENCY_FAILURE' | 'STORAGE_FAILURE' | 'AGENT_FAILURE' | 'VERIFICATION_FAILURE' | 'RATE_LIMITED' | 'CIRCUIT_OPEN' | 'DEGRADED_MODE';
-export class ResolveXOperationalError extends Error { constructor(readonly code: ResolveXErrorCode, message: string, readonly metadata: Record<string, string> = {}) { super(message); this.name = 'ResolveXOperationalError'; } }
+export type ResolveXErrorCode =
+  | 'VALIDATION_ERROR'
+  | 'AUTHORIZATION_ERROR'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'APPROVAL_REQUIRED'
+  | 'TOOL_FAILURE'
+  | 'TOOL_TIMEOUT'
+  | 'DEPENDENCY_FAILURE'
+  | 'STORAGE_FAILURE'
+  | 'AGENT_FAILURE'
+  | 'VERIFICATION_FAILURE'
+  | 'RATE_LIMITED'
+  | 'CIRCUIT_OPEN'
+  | 'DEGRADED_MODE';
+export class ResolveXOperationalError extends Error {
+  constructor(
+    readonly code: ResolveXErrorCode,
+    message: string,
+    readonly metadata: Record<string, string> = {},
+  ) {
+    super(message);
+    this.name = 'ResolveXOperationalError';
+  }
+}
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
-export interface CircuitBreaker { state(): CircuitState; execute<T>(operation: () => Promise<T>): Promise<T>; }
-export function createCircuitBreaker(options: { failureThreshold?: number; cooldownMs?: number; now?: () => number } = {}): CircuitBreaker { const threshold = options.failureThreshold ?? 3; const cooldown = options.cooldownMs ?? 30_000; const now = options.now ?? Date.now; let failures = 0; let openedAt: number | undefined; return { state() { if (openedAt === undefined) return 'CLOSED'; return now() - openedAt >= cooldown ? 'HALF_OPEN' : 'OPEN'; }, async execute(operation) { if (this.state() === 'OPEN') throw new ResolveXOperationalError('CIRCUIT_OPEN', 'Dependency circuit is open'); try { const result = await operation(); failures = 0; openedAt = undefined; return result; } catch (error) { failures++; if (failures >= threshold) openedAt = now(); throw error; } } }; }
-export async function retrySafe<T>(operation: () => Promise<T>, options: { attempts?: number; retryable?: boolean; delayMs?: number } = {}): Promise<T> { if (options.retryable === false) return operation(); const attempts = options.attempts ?? 3; let last: unknown; for (let attempt = 0; attempt < attempts; attempt++) { try { return await operation(); } catch (error) { last = error; if (attempt + 1 < attempts && options.delayMs) await new Promise(resolve => setTimeout(resolve, options.delayMs * (attempt + 1))); } } throw last; }
-export function degradedMode(input: { graphAvailable: boolean; memoryAvailable: boolean; predictionAvailable: boolean }): { enabled: boolean; unavailable: string[] } { const unavailable = Object.entries(input).filter(([, available]) => !available).map(([name]) => name.replace('Available', '')); return { enabled: unavailable.length > 0, unavailable }; }
+export interface CircuitBreaker {
+  state(): CircuitState;
+  execute<T>(operation: () => Promise<T>): Promise<T>;
+}
+export function createCircuitBreaker(
+  options: { failureThreshold?: number; cooldownMs?: number; now?: () => number } = {},
+): CircuitBreaker {
+  const threshold = options.failureThreshold ?? 3;
+  const cooldown = options.cooldownMs ?? 30_000;
+  const now = options.now ?? Date.now;
+  let failures = 0;
+  let openedAt: number | undefined;
+  return {
+    state() {
+      if (openedAt === undefined) {
+        return 'CLOSED';
+      }
+      return now() - openedAt >= cooldown ? 'HALF_OPEN' : 'OPEN';
+    },
+    async execute(operation) {
+      if (this.state() === 'OPEN') {
+        throw new ResolveXOperationalError('CIRCUIT_OPEN', 'Dependency circuit is open');
+      }
+      try {
+        const result = await operation();
+        failures = 0;
+        openedAt = undefined;
+        return result;
+      } catch (error) {
+        failures++;
+        if (failures >= threshold) {
+          openedAt = now();
+        }
+        throw error;
+      }
+    },
+  };
+}
+export async function retrySafe<T>(
+  operation: () => Promise<T>,
+  options: { attempts?: number; retryable?: boolean; delayMs?: number } = {},
+): Promise<T> {
+  if (options.retryable === false) {
+    return operation();
+  }
+  const attempts = options.attempts ?? 3;
+  const delayMs = options.delayMs ?? 0;
+  let last: unknown;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      last = error;
+      if (attempt + 1 < attempts && delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)));
+      }
+    }
+  }
+  throw last;
+}
+export function degradedMode(input: {
+  graphAvailable: boolean;
+  memoryAvailable: boolean;
+  predictionAvailable: boolean;
+}): { enabled: boolean; unavailable: string[] } {
+  const unavailable = Object.entries(input)
+    .filter(([, available]) => !available)
+    .map(([name]) => name.replace('Available', ''));
+  return { enabled: unavailable.length > 0, unavailable };
+}
