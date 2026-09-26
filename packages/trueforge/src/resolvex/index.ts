@@ -86,3 +86,7 @@ export {
 } from './tools/devopsTool';
 
 export type { AIGenerateRequest, AIProvider, AIStreamEvent, AIStructuredRequest, AITextResult } from './ai/provider';
+
+export { createIncidentService } from './services/incidentService';
+export { createInMemoryIncidentStore, type IncidentStore } from './store/incidentStore';
+export { createDemoEnvironment, createDemoTools, type DemoEnvironment } from './tools/demoTools';
