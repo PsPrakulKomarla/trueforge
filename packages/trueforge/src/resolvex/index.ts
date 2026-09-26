@@ -117,3 +117,4 @@ export {
 export { createDemoEnvironment, createDemoTools, type DemoEnvironment } from './tools/demoTools';
 export { ResolvexToolMCP, createResolvexToolMCP } from './tools/registryAdapter';
 export { executeResolveXInvestigation, type ResolveXExecutionResult, type ResolveXExecutionState } from './agentExecution';
+export { ResolveXExecutionSchema, ResolveXExecutionStateSchema, assertExecutionTransition, canTransitionExecution, decideRecovery, type ResolveXExecution, type ResolveXExecutionState, type RecoveryDecision } from './domain/execution';
